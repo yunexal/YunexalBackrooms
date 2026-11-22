@@ -233,7 +233,7 @@ public final class BackroomsEntityManager implements Listener {
                 parts.add(spawnBlockPart(w, loc, host, hide, +0.11f, -1.62f, +0.26f, 0.12f, 0.50f, 0.12f, 0, false));
                 parts.add(spawnBlockPart(w, loc, host, hide, -0.23f, -1.62f, -0.38f, 0.12f, 0.50f, 0.12f, 0, false));
                 parts.add(spawnBlockPart(w, loc, host, hide, +0.11f, -1.62f, -0.38f, 0.12f, 0.50f, 0.12f, 0, false));
-                parts.add(spawnItemPart(w, loc, host, "backrooms_hound_eyes", 0.0f, -0.75f, +0.55f, 0.42f, 0.42f, 0.42f, Display.Billboard.FIXED, true));
+                parts.add(spawnItemPart(w, loc, host, "backrooms_hound_eyes", 0.0f, -0.75f, +0.71f, 0.42f, 0.42f, 0.42f, Display.Billboard.FIXED, true));
             }
         }
         return parts;
