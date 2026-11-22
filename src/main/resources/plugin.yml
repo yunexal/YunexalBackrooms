@@ -1,0 +1,19 @@
+name: YunexalBackrooms
+version: ${project.version}
+main: com.yunexal.backrooms.YunexalBackroomsPlugin
+api-version: '1.21'
+load: STARTUP
+description: Procedural Backrooms Level 0 world generator with mandatory Limbo resource pack verification
+author: Yunexal Team
+
+commands:
+  backrooms:
+    description: Керування та інформація Yunexal Backrooms
+    permission: yunexal.backrooms.use
+    aliases: [br, backroom]
+
+permissions:
+  yunexal.backrooms.use:
+    default: true
+  yunexal.backrooms.admin:
+    default: op

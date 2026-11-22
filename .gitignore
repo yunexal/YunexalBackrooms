@@ -1,0 +1,5 @@
+target/
+*.jar
+resourcepack/pack/
+resourcepack/dist/
+*.log

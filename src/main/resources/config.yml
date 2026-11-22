@@ -1,0 +1,41 @@
+# ============================================================
+# YUNEXAL BACKROOMS — Level 0 & Limbo Configuration (26.3)
+# ============================================================
+
+resource-pack:
+  enabled: true
+  url: "https://mirror.yunexal.com/packs/YunexalBackrooms-RP.zip"
+  sha1: "5295210c4396017ee6c4c3491c88dac7c879e7ce"
+  required: true
+  prompt: "&e&lYUNEXAL BACKROOMS\n&7Для входу на &fРівень 0 «Лобі» &7обов'язково прийміть ресурс-пак.\n&8Текстури шпалер, стелі, килиму та фоновий гул ламп."
+  timeout-seconds: 45
+  send-delay-ticks: 10
+  fallback-server: "hub1"
+
+limbo:
+  world-name: "world_limbo"
+  spawn-x: 0.5
+  spawn-y: 65.0
+  spawn-z: 0.5
+  box-radius: 5
+
+level0:
+  world-name: "world"
+  # 0 = брати seed світу; фіксоване значення дає стабільний детермінований лабіринт
+  seed: 19780412
+  floor-y: 64
+  wall-height: 4
+  extra-braiding-chance: 0.34
+  pillar-hall-chance: 0.16
+  narrow-maze-chance: 0.18
+  blackout-zone-chance: 0.14
+  flicker-light-chance: 0.12
+  dead-light-chance: 0.10
+  vent-chance: 0.045
+  damp-pillar-chance: 0.18
+
+ambient:
+  enabled: true
+  hum-interval-ticks: 140
+  flicker-sound-chance: 0.24
+  distant-thump-chance: 0.06
