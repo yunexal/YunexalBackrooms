@@ -110,6 +110,9 @@ public final class LimboManager implements Listener {
         w.setGameRule(GameRules.SHOW_DEATH_MESSAGES, false);
         w.setGameRule(GameRules.LOCATOR_BAR, false);
         w.setGameRule(GameRules.REDUCED_DEBUG_INFO, true);
+        w.setViewDistance(4);
+        w.setSendViewDistance(4);
+        w.setSimulationDistance(4);
     }
 
     private void buildLimboChamber(World world, BackroomsConfig cfg) {

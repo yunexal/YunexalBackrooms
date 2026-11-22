@@ -20,6 +20,7 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
     private LimboManager limboManager;
     private BackroomsListeners listeners;
     private HallucinationManager hallucinations;
+    private BodycamManager bodycam;
     private BackroomsVoicePlugin voicePlugin;
 
     @Override
@@ -45,6 +46,7 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         this.limboManager = new LimboManager(this);
         this.listeners = new BackroomsListeners(this);
         this.hallucinations = new HallucinationManager(this);
+        this.bodycam = new BodycamManager(this);
 
         getServer().getPluginManager().registerEvents(craftingManager, this);
         getServer().getPluginManager().registerEvents(limboManager, this);
@@ -62,11 +64,13 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
             this.limboManager.init();
             this.listeners.start();
             this.hallucinations.start();
+            this.bodycam.start();
             registerVoiceChatHook();
             getLogger().info("YunexalBackrooms worlds ready: Level 0='"
                     + backroomsConfig.getLevel0WorldName() + "', Limbo='"
                     + backroomsConfig.getLimboWorldName() + "', Border="
-                    + (int) backroomsConfig.getWorldBorderSize());
+                    + (int) backroomsConfig.getWorldBorderSize()
+                    + ", View/Sim=" + backroomsConfig.getViewDistance() + "/" + backroomsConfig.getSimulationDistance());
         });
 
         getLogger().info("YunexalBackrooms enabled (STARTUP). Level 0 world='" + backroomsConfig.getLevel0WorldName()
@@ -80,6 +84,9 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         }
         if (hallucinations != null) {
             hallucinations.shutdown();
+        }
+        if (bodycam != null) {
+            bodycam.shutdown();
         }
         if (voicePlugin != null) {
             voicePlugin.shutdown();
@@ -137,6 +144,9 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         w.setGameRule(GameRules.KEEP_INVENTORY, true);
         w.setGameRule(GameRules.LOCATOR_BAR, false);
         w.setGameRule(GameRules.REDUCED_DEBUG_INFO, true);
+        w.setViewDistance(backroomsConfig.getViewDistance());
+        w.setSendViewDistance(backroomsConfig.getViewDistance());
+        w.setSimulationDistance(backroomsConfig.getSimulationDistance());
         w.getWorldBorder().setCenter(0.0, 0.0);
         w.getWorldBorder().setSize(backroomsConfig.getWorldBorderSize());
         w.setSpawnLocation(level0Generator.findSafeSpawn(w));
@@ -190,6 +200,10 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
 
     public HallucinationManager getHallucinations() {
         return hallucinations;
+    }
+
+    public BodycamManager getBodycam() {
+        return bodycam;
     }
 
     public @Nullable World getLevel0World() {

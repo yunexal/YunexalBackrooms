@@ -24,6 +24,8 @@ level0:
   seed: 19780412
   floor-y: 64
   wall-height: 4
+  view-distance: 6
+  simulation-distance: 6
   world-border-size: 10000.0
   spawn-radius: 3800
   extra-braiding-chance: 0.34
@@ -47,3 +49,7 @@ ambient:
   flicker-cooldown-seconds: 22
   flicker-sound-chance: 0.12
   distant-thump-chance: 0.015
+
+bodycam:
+  enabled: true
+  intensity: 1.0

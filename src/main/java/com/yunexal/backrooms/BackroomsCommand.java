@@ -36,6 +36,8 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
                     .append(Component.text(cfg.isRpEnabled() ? "Увімкнений (обов'язковий)" : "Вимкнений", NamedTextColor.AQUA)));
             sender.sendMessage(Component.text("Рецепти: ", NamedTextColor.GRAY)
                     .append(Component.text("/br craft", NamedTextColor.GOLD))
+                    .append(Component.text(" | Бодікам: ", NamedTextColor.GRAY))
+                    .append(Component.text("/br bodycam", NamedTextColor.YELLOW))
                     .append(Component.text(" | Хаб: ", NamedTextColor.GRAY))
                     .append(Component.text("/br hub", NamedTextColor.AQUA)));
             if (sender.hasPermission("yunexal.backrooms.admin") && sender instanceof Player p && plugin.getLevel0World() != null && p.getWorld().equals(plugin.getLevel0World())) {
@@ -48,6 +50,16 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
+            case "bodycam", "cam" -> {
+                if (!(sender instanceof Player p)) {
+                    sender.sendMessage(Component.text("Команда лише для гравців.", NamedTextColor.RED));
+                    return true;
+                }
+                boolean on = plugin.getBodycam().toggleFor(p);
+                p.sendMessage(Component.text("Ефект бодікаму (хитання камери): ", NamedTextColor.GRAY)
+                        .append(Component.text(on ? "Увімкнено" : "Вимкнено", on ? NamedTextColor.GREEN : NamedTextColor.RED)));
+                return true;
+            }
             case "craft", "recipes" -> {
                 if (sender instanceof Player p) {
                     plugin.getCraftingManager().sendRecipeGuide(p);
@@ -111,7 +123,7 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             default -> {
-                sender.sendMessage(Component.text("Використання: /br <info|craft|hub|reload|reloadrp|tp>", NamedTextColor.YELLOW));
+                sender.sendMessage(Component.text("Використання: /br <info|craft|bodycam|hub|reload|reloadrp|tp>", NamedTextColor.YELLOW));
                 return true;
             }
         }
@@ -122,9 +134,9 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
                                                 @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
             if (sender.hasPermission("yunexal.backrooms.admin")) {
-                return List.of("info", "craft", "hub", "reload", "reloadrp", "tp");
+                return List.of("info", "craft", "bodycam", "hub", "reload", "reloadrp", "tp");
             }
-            return List.of("info", "craft", "hub");
+            return List.of("info", "craft", "bodycam", "hub");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("tp") && sender.hasPermission("yunexal.backrooms.admin")) {
             return List.of("level0", "limbo");

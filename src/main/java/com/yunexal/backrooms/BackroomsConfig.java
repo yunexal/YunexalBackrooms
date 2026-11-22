@@ -33,6 +33,8 @@ public final class BackroomsConfig {
     private final long level0Seed;
     private final int floorY;
     private final int wallHeight;
+    private final int viewDistance;
+    private final int simulationDistance;
     private final double worldBorderSize;
     private final int spawnRadius;
     private final double extraBraidingChance;
@@ -54,6 +56,8 @@ public final class BackroomsConfig {
     private final int flickerCooldownSeconds;
     private final double flickerSoundChance;
     private final double distantThumpChance;
+    private final boolean bodycamEnabled;
+    private final double bodycamIntensity;
 
     public BackroomsConfig(FileConfiguration cfg) {
         this.rpEnabled = cfg.getBoolean("resource-pack.enabled", true);
@@ -80,6 +84,8 @@ public final class BackroomsConfig {
         this.level0Seed = cfg.getLong("level0.seed", 19780412L);
         this.floorY = Math.max(-50, Math.min(200, cfg.getInt("level0.floor-y", 64)));
         this.wallHeight = Math.max(3, Math.min(8, cfg.getInt("level0.wall-height", 4)));
+        this.viewDistance = Math.max(3, Math.min(16, cfg.getInt("level0.view-distance", 6)));
+        this.simulationDistance = Math.max(3, Math.min(16, cfg.getInt("level0.simulation-distance", 6)));
         this.worldBorderSize = Math.max(256.0, cfg.getDouble("level0.world-border-size", 10000.0));
         this.spawnRadius = Math.max(64, cfg.getInt("level0.spawn-radius", 3800));
         this.extraBraidingChance = clamp01(cfg.getDouble("level0.extra-braiding-chance", 0.34));
@@ -101,6 +107,8 @@ public final class BackroomsConfig {
         this.flickerCooldownSeconds = Math.max(5, cfg.getInt("ambient.flicker-cooldown-seconds", 22));
         this.flickerSoundChance = clamp01(cfg.getDouble("ambient.flicker-sound-chance", 0.12));
         this.distantThumpChance = clamp01(cfg.getDouble("ambient.distant-thump-chance", 0.015));
+        this.bodycamEnabled = cfg.getBoolean("bodycam.enabled", true);
+        this.bodycamIntensity = Math.max(0.1, Math.min(2.5, cfg.getDouble("bodycam.intensity", 1.0)));
     }
 
     private static double clamp01(double v) {
@@ -140,6 +148,8 @@ public final class BackroomsConfig {
     public int getFloorY() { return floorY; }
     public int getWallHeight() { return wallHeight; }
     public int getCeilingY() { return floorY + wallHeight + 1; }
+    public int getViewDistance() { return viewDistance; }
+    public int getSimulationDistance() { return simulationDistance; }
     public double getWorldBorderSize() { return worldBorderSize; }
     public int getSpawnRadius() { return spawnRadius; }
     public double getExtraBraidingChance() { return extraBraidingChance; }
@@ -161,4 +171,6 @@ public final class BackroomsConfig {
     public int getFlickerCooldownSeconds() { return flickerCooldownSeconds; }
     public double getFlickerSoundChance() { return flickerSoundChance; }
     public double getDistantThumpChance() { return distantThumpChance; }
+    public boolean isBodycamEnabled() { return bodycamEnabled; }
+    public double getBodycamIntensity() { return bodycamIntensity; }
 }

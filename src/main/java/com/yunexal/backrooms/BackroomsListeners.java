@@ -727,5 +727,8 @@ public final class BackroomsListeners implements Listener {
         if (plugin.getHallucinations() != null) {
             plugin.getHallucinations().clearPlayerState(event.getPlayer());
         }
+        if (plugin.getBodycam() != null) {
+            plugin.getBodycam().clearPlayer(event.getPlayer());
+        }
     }
 }
