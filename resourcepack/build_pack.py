@@ -16,6 +16,7 @@ import zipfile
 
 import numpy as np
 from PIL import Image
+from build_blockbench_entities import generate_blockbench_entities
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 PACK_DIR = os.path.join(ROOT, "pack")
@@ -853,6 +854,7 @@ def main():
     })
 
     generate_textures()
+    generate_blockbench_entities(PACK_DIR, os.path.join(ROOT, "blockbench"))
     generate_audio()
 
     with zipfile.ZipFile(DIST_ZIP, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:

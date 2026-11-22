@@ -8,7 +8,6 @@ import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Block;
-import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
@@ -29,7 +28,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
-import org.joml.AxisAngle4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
@@ -42,10 +41,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Custom Backrooms entities framework (Bacteria, Smiler, Hound):
- * - Invisible silent Zombie pathfinding hosts paired with smooth 60fps interpolated Display passenger rigs
+ * Custom Blockbench-grade Backrooms entities framework (Bacteria, Smiler, Hound):
+ * - Invisible silent Zombie pathfinding hosts paired with multi-bone ItemDisplay rigs compiled from Blockbench models
+ * - Smooth 60fps interpolated skeletal walking/snarling/floating joint animations
  * - Canonical behaviors: Manila Room safe sanctuary, Smiler flashlight stare-lock, Hound eye intimidation, Bacteria shriek chase
- * - Ready for both admin testing (/br entity spawn) and automatic spawning (/br entity autospawn on)
  */
 public final class BackroomsEntityManager implements Listener {
     public enum EntityKind {
@@ -63,22 +62,36 @@ public final class BackroomsEntityManager implements Listener {
     private BukkitTask aiTask;
     private BukkitTask spawnTask;
 
+    private static final class BonePart {
+        final ItemDisplay display;
+        final float baseX;
+        final float baseY;
+        final float baseZ;
+        final float scale;
+
+        BonePart(ItemDisplay display, float baseX, float baseY, float baseZ, float scale) {
+            this.display = display;
+            this.baseX = baseX;
+            this.baseY = baseY;
+            this.baseZ = baseZ;
+            this.scale = scale;
+        }
+    }
+
     private static final class TrackedEntity {
         final EntityKind kind;
         final Zombie host;
-        final List<Display> parts;
-        final boolean syncYaw;
+        final Map<String, BonePart> bones = new ConcurrentHashMap<>();
+        double animPhase;
         long nextVocalAtMs;
         long nextStepAtMs;
         long chaseBurstUntilMs;
         long houndPauseUntilMs;
         boolean stunned;
 
-        TrackedEntity(EntityKind kind, Zombie host, List<Display> parts, boolean syncYaw) {
+        TrackedEntity(EntityKind kind, Zombie host) {
             this.kind = kind;
             this.host = host;
-            this.parts = parts;
-            this.syncYaw = syncYaw;
         }
     }
 
@@ -152,7 +165,6 @@ public final class BackroomsEntityManager implements Listener {
             return false;
         }
 
-        // Prevent spawning inside walls or Manila Room sanctuary
         if (plugin.getLevel0Generator().getZoneAtBlock(level0, loc.getBlockX(), loc.getBlockZ())
                 == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
             return false;
@@ -200,75 +212,44 @@ public final class BackroomsEntityManager implements Listener {
             }
         });
 
-        List<Display> parts = buildVisualRig(level0, loc, host, kind);
-        boolean syncYaw = (kind != EntityKind.SMILER);
-        tracked.put(host.getUniqueId(), new TrackedEntity(kind, host, parts, syncYaw));
+        TrackedEntity te = new TrackedEntity(kind, host);
+        buildSkeletalRig(level0, loc, te);
+        tracked.put(host.getUniqueId(), te);
         return true;
     }
 
-    private List<Display> buildVisualRig(World w, Location loc, Zombie host, EntityKind kind) {
-        List<Display> parts = new ArrayList<>();
-        switch (kind) {
+    private void buildSkeletalRig(World w, Location loc, TrackedEntity te) {
+        // Adult Zombie passenger anchor sits ~1.62m above ground.
+        // In ItemDisplay(FIXED) with yaw=0, +Z is forward along entity facing.
+        switch (te.kind) {
             case BACTERIA -> {
-                // Tall (~2.4m) gaunt dark wire creature mounted cleanly onto Zombie seat
-                Material mat = Material.BLACK_GLAZED_TERRACOTTA;
-                parts.add(spawnBlockPart(w, loc, host, mat, -0.20f, -1.62f, -0.07f, 0.13f, 1.10f, 0.13f, 0, false));
-                parts.add(spawnBlockPart(w, loc, host, mat, +0.07f, -1.62f, -0.07f, 0.13f, 1.10f, 0.13f, 0, false));
-                parts.add(spawnBlockPart(w, loc, host, mat, -0.14f, -0.54f, -0.09f, 0.28f, 0.90f, 0.18f, 0, false));
-                parts.add(spawnBlockPart(w, loc, host, mat, -0.34f, -0.62f, -0.06f, 0.11f, 0.95f, 0.11f, 0, false));
-                parts.add(spawnBlockPart(w, loc, host, mat, +0.23f, -0.62f, -0.06f, 0.11f, 0.95f, 0.11f, 0, false));
-                parts.add(spawnBlockPart(w, loc, host, mat, -0.15f, +0.34f, -0.15f, 0.30f, 0.44f, 0.30f, 0, false));
+                float s = 0.92f;
+                addBone(w, loc, te, "leg_left", "bacteria_leg_left", +0.13f, -0.60f, 0.0f, s, false);
+                addBone(w, loc, te, "leg_right", "bacteria_leg_right", -0.13f, -0.60f, 0.0f, s, false);
+                addBone(w, loc, te, "torso", "bacteria_torso", 0.0f, -0.49f, 0.0f, s, false);
+                addBone(w, loc, te, "arm_left", "bacteria_arm_left", +0.26f, +0.22f, 0.0f, s, false);
+                addBone(w, loc, te, "arm_right", "bacteria_arm_right", -0.26f, +0.22f, 0.0f, s, false);
+                addBone(w, loc, te, "head", "bacteria_head", 0.0f, +0.34f, +0.06f, s, false);
             }
             case SMILER -> {
-                // Floating fullbright glowing white eyes + smile sprite in darkness
-                ItemDisplay face = spawnItemPart(w, loc, host, "backrooms_smiler", 0.0f, -0.15f, 0.0f, 1.05f, 1.05f, 1.05f, Display.Billboard.VERTICAL, true);
-                parts.add(face);
+                addBone(w, loc, te, "shroud", "smiler_shroud", 0.0f, -0.15f, 0.0f, 1.05f, false);
+                addBone(w, loc, te, "face", "smiler_face", 0.0f, -0.15f, 0.0f, 1.05f, true);
             }
             case HOUND -> {
-                // Low hunched dark quadruped body + glowing predator eyes
-                Material hide = Material.GRAY_GLAZED_TERRACOTTA;
-                parts.add(spawnBlockPart(w, loc, host, hide, -0.22f, -1.15f, -0.45f, 0.44f, 0.38f, 0.90f, 0, false));
-                parts.add(spawnBlockPart(w, loc, host, hide, -0.18f, -0.92f, +0.34f, 0.36f, 0.34f, 0.36f, 0, false));
-                parts.add(spawnBlockPart(w, loc, host, hide, -0.23f, -1.62f, +0.26f, 0.12f, 0.50f, 0.12f, 0, false));
-                parts.add(spawnBlockPart(w, loc, host, hide, +0.11f, -1.62f, +0.26f, 0.12f, 0.50f, 0.12f, 0, false));
-                parts.add(spawnBlockPart(w, loc, host, hide, -0.23f, -1.62f, -0.38f, 0.12f, 0.50f, 0.12f, 0, false));
-                parts.add(spawnBlockPart(w, loc, host, hide, +0.11f, -1.62f, -0.38f, 0.12f, 0.50f, 0.12f, 0, false));
-                parts.add(spawnItemPart(w, loc, host, "backrooms_hound_eyes", 0.0f, -0.75f, +0.71f, 0.42f, 0.42f, 0.42f, Display.Billboard.FIXED, true));
+                float s = 0.96f;
+                addBone(w, loc, te, "torso", "hound_torso", 0.0f, -0.92f, 0.0f, s, false);
+                addBone(w, loc, te, "head", "hound_head", 0.0f, -0.82f, +0.42f, s, false);
+                addBone(w, loc, te, "eyes", "hound_eyes", 0.0f, -0.82f, +0.42f, s, true);
+                addBone(w, loc, te, "leg_fl", "hound_leg_fl", +0.19f, -0.87f, +0.33f, s, false);
+                addBone(w, loc, te, "leg_fr", "hound_leg_fr", -0.19f, -0.87f, +0.33f, s, false);
+                addBone(w, loc, te, "leg_bl", "hound_leg_bl", +0.18f, -0.90f, -0.35f, s, false);
+                addBone(w, loc, te, "leg_br", "hound_leg_br", -0.18f, -0.90f, -0.35f, s, false);
             }
         }
-        return parts;
     }
 
-    private BlockDisplay spawnBlockPart(World w, Location loc, Zombie host, Material mat,
-                                        float tx, float ty, float tz, float sx, float sy, float sz,
-                                        int bright, boolean fullbright) {
-        BlockDisplay d = w.spawn(loc, BlockDisplay.class, bd -> {
-            bd.setBlock(mat.createBlockData());
-            bd.setBillboard(Display.Billboard.FIXED);
-            bd.setInterpolationDelay(0);
-            bd.setInterpolationDuration(3);
-            bd.setTeleportDuration(2);
-            if (fullbright) {
-                bd.setBrightness(new Display.Brightness(15, 15));
-            } else if (bright > 0) {
-                bd.setBrightness(new Display.Brightness(bright, 0));
-            }
-            bd.setTransformation(new Transformation(
-                    new Vector3f(tx, ty, tz),
-                    new AxisAngle4f(0f, 0f, 1f, 0f),
-                    new Vector3f(sx, sy, sz),
-                    new AxisAngle4f(0f, 0f, 1f, 0f)
-            ));
-            bd.getPersistentDataContainer().set(partTagKey, PersistentDataType.BYTE, (byte) 1);
-            bd.setPersistent(false);
-        });
-        host.addPassenger(d);
-        return d;
-    }
-
-    private ItemDisplay spawnItemPart(World w, Location loc, Zombie host, String modelName,
-                                      float tx, float ty, float tz, float sx, float sy, float sz,
-                                      Display.Billboard billboard, boolean fullbright) {
+    private void addBone(World w, Location loc, TrackedEntity te, String key, String modelName,
+                         float bx, float by, float bz, float scale, boolean fullbright) {
         ItemStack stack = new ItemStack(Material.PAPER);
         ItemMeta meta = stack.getItemMeta();
         meta.setItemModel(NamespacedKey.minecraft(modelName));
@@ -276,24 +257,40 @@ public final class BackroomsEntityManager implements Listener {
 
         ItemDisplay d = w.spawn(loc, ItemDisplay.class, id -> {
             id.setItemStack(stack);
-            id.setBillboard(billboard);
+            id.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
+            id.setBillboard(Display.Billboard.FIXED);
             id.setInterpolationDelay(0);
             id.setInterpolationDuration(3);
             id.setTeleportDuration(2);
+            id.setViewRange(1.2f);
             if (fullbright) {
                 id.setBrightness(new Display.Brightness(15, 15));
             }
             id.setTransformation(new Transformation(
-                    new Vector3f(tx, ty, tz),
-                    new AxisAngle4f(0f, 0f, 1f, 0f),
-                    new Vector3f(sx, sy, sz),
-                    new AxisAngle4f(0f, 0f, 1f, 0f)
+                    new Vector3f(bx, by, bz),
+                    new Quaternionf(),
+                    new Vector3f(scale, scale, scale),
+                    new Quaternionf()
             ));
             id.getPersistentDataContainer().set(partTagKey, PersistentDataType.BYTE, (byte) 1);
             id.setPersistent(false);
         });
-        host.addPassenger(d);
-        return d;
+        te.host.addPassenger(d);
+        te.bones.put(key, new BonePart(d, bx, by, bz, scale));
+    }
+
+    private void animateBone(BonePart bone, float dx, float dy, float dz, float pitchRad, float yawRad, float rollRad) {
+        if (bone == null || !bone.display.isValid()) {
+            return;
+        }
+        Quaternionf q = new Quaternionf().rotateYXZ(yawRad, pitchRad, rollRad);
+        bone.display.setInterpolationDelay(0);
+        bone.display.setTransformation(new Transformation(
+                new Vector3f(bone.baseX + dx, bone.baseY + dy, bone.baseZ + dz),
+                q,
+                new Vector3f(bone.scale, bone.scale, bone.scale),
+                new Quaternionf()
+        ));
     }
 
     private void tickAI() {
@@ -343,7 +340,6 @@ public final class BackroomsEntityManager implements Listener {
                 continue;
             }
 
-            // Do not pursue into Manila Room safe zone
             Level0ChunkGenerator.ZoneType pZone = plugin.getLevel0Generator()
                     .getZoneAtBlock(level0, nearest.getLocation().getBlockX(), nearest.getLocation().getBlockZ());
             if (pZone == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
@@ -352,21 +348,66 @@ public final class BackroomsEntityManager implements Listener {
                 z.setTarget(nearest);
             }
 
-            if (te.syncYaw) {
-                float yaw = mLoc.getYaw();
-                for (Display d : te.parts) {
-                    if (d.isValid()) {
-                        d.setRotation(yaw, 0f);
-                    }
-                }
-            }
-
             boolean los = nearest.hasLineOfSight(z);
             double dist = Math.sqrt(nearestSq);
             switch (te.kind) {
                 case BACTERIA -> tickBacteria(te, z, nearest, mLoc, dist, los, now);
                 case SMILER -> tickSmiler(te, z, nearest, mLoc, dist, los, now);
                 case HOUND -> tickHound(te, z, nearest, mLoc, dist, los, now);
+            }
+            animateEntity(te, z, nearest, mLoc, now);
+        }
+    }
+
+    private void animateEntity(TrackedEntity te, Zombie z, Player nearest, Location mLoc, long now) {
+        double hSpeed = Math.hypot(z.getVelocity().getX(), z.getVelocity().getZ());
+        boolean moving = hSpeed > 0.015;
+        te.animPhase += moving ? Math.min(0.65, 0.25 + hSpeed * 2.2) : 0.10;
+        float ph = (float) te.animPhase;
+
+        float rigYaw = mLoc.getYaw();
+        if (te.kind == EntityKind.SMILER && nearest != null) {
+            Vector toP = nearest.getLocation().toVector().subtract(mLoc.toVector());
+            rigYaw = (float) Math.toDegrees(Math.atan2(-toP.getX(), toP.getZ()));
+        }
+        for (BonePart bp : te.bones.values()) {
+            if (bp.display.isValid()) {
+                bp.display.setRotation(rigYaw, 0f);
+            }
+        }
+
+        switch (te.kind) {
+            case BACTERIA -> {
+                boolean bursting = now < te.chaseBurstUntilMs;
+                float swing = moving ? (float) Math.sin(ph) * (bursting ? 0.58f : 0.40f) : 0.0f;
+                float bob = moving ? (float) Math.abs(Math.cos(ph)) * 0.05f : (float) Math.sin(ph) * 0.015f;
+                float twitch = bursting ? (float) Math.sin(ph * 3.1f) * 0.22f : (float) Math.sin(ph * 0.6f) * 0.14f;
+
+                animateBone(te.bones.get("torso"), 0f, bob, 0f, moving ? 0.14f : 0.05f, 0f, twitch * 0.35f);
+                animateBone(te.bones.get("head"), 0f, bob, 0f, -0.06f + twitch * 0.4f, 0f, 0.22f + twitch);
+                animateBone(te.bones.get("arm_left"), 0f, bob, 0f, (bursting ? 0.55f : 0.18f) - swing * 0.85f, 0f, -0.14f);
+                animateBone(te.bones.get("arm_right"), 0f, bob, 0f, (bursting ? 0.55f : 0.18f) + swing * 0.85f, 0f, +0.14f);
+                animateBone(te.bones.get("leg_left"), 0f, 0f, 0f, +swing, 0f, 0f);
+                animateBone(te.bones.get("leg_right"), 0f, 0f, 0f, -swing, 0f, 0f);
+            }
+            case SMILER -> {
+                float hover = (float) Math.sin(ph * 0.7f) * 0.08f;
+                float tilt = (float) Math.sin(ph * 0.45f) * 0.09f;
+                animateBone(te.bones.get("shroud"), 0f, hover, 0f, 0f, 0f, tilt);
+                animateBone(te.bones.get("face"), 0f, hover, 0f, 0f, 0f, tilt);
+            }
+            case HOUND -> {
+                float stride = moving ? (float) Math.sin(ph * 1.25f) * 0.55f : 0.0f;
+                float bounce = moving ? (float) Math.abs(Math.cos(ph * 1.25f)) * 0.05f : (float) Math.sin(ph) * 0.01f;
+                float snarl = (now < te.houndPauseUntilMs) ? -0.18f : (float) Math.sin(ph * 0.8f) * 0.06f;
+
+                animateBone(te.bones.get("torso"), 0f, bounce, 0f, moving ? 0.05f : 0f, 0f, 0f);
+                animateBone(te.bones.get("head"), 0f, bounce, 0f, snarl, 0f, (float) Math.sin(ph * 0.5f) * 0.08f);
+                animateBone(te.bones.get("eyes"), 0f, bounce, 0f, snarl, 0f, (float) Math.sin(ph * 0.5f) * 0.08f);
+                animateBone(te.bones.get("leg_fl"), 0f, 0f, 0f, +stride, 0f, 0f);
+                animateBone(te.bones.get("leg_br"), 0f, 0f, 0f, +stride, 0f, 0f);
+                animateBone(te.bones.get("leg_fr"), 0f, 0f, 0f, -stride, 0f, 0f);
+                animateBone(te.bones.get("leg_bl"), 0f, 0f, 0f, -stride, 0f, 0f);
             }
         }
     }
@@ -490,9 +531,9 @@ public final class BackroomsEntityManager implements Listener {
         for (Entity p : te.host.getPassengers()) {
             p.remove();
         }
-        for (Display d : te.parts) {
-            if (d.isValid()) {
-                d.remove();
+        for (BonePart bp : te.bones.values()) {
+            if (bp.display.isValid()) {
+                bp.display.remove();
             }
         }
         if (te.host.isValid()) {
@@ -563,9 +604,9 @@ public final class BackroomsEntityManager implements Listener {
         for (Entity p : te.host.getPassengers()) {
             p.remove();
         }
-        for (Display d : te.parts) {
-            if (d.isValid()) {
-                d.remove();
+        for (BonePart bp : te.bones.values()) {
+            if (bp.display.isValid()) {
+                bp.display.remove();
             }
         }
         if (ThreadLocalRandom.current().nextDouble() < 0.35) {
