@@ -451,14 +451,8 @@ public final class Level1Manager implements Listener {
         if (l1 == null || !event.getWorld().equals(l1)) {
             return;
         }
-        int chunkX = event.getChunk().getX();
-        int chunkZ = event.getChunk().getZ();
-        if (Math.floorMod(chunkX, 2) != 0 || Math.floorMod(chunkZ, 2) != 0) {
-            return;
-        }
-
-        int rx = Math.floorDiv(chunkX, 2);
-        int rz = Math.floorDiv(chunkZ, 2);
+        int rx = Math.floorDiv(event.getChunk().getX(), 2);
+        int rz = Math.floorDiv(event.getChunk().getZ(), 2);
         long seed = plugin.getBackroomsConfig().getLevel1Seed();
         Level1ChunkGenerator.Level1ZoneType zone = plugin.getLevel1Generator().getZoneAtRegion(seed, rx, rz);
         if (!Level1ChunkGenerator.isOutpostZone(zone)) {
@@ -477,16 +471,21 @@ public final class Level1Manager implements Listener {
     }
 
     private void ensureOutpostNpcAtRegion(World l1, Level1ChunkGenerator.Level1ZoneType zone, int rx, int rz, Location npcLoc) {
-        String expectedRole = zone.name();
-        boolean npcFound = false;
-        for (Entity e : l1.getNearbyEntities(npcLoc, 8.0, 4.0, 8.0)) {
-            if (e instanceof Villager v && expectedRole.equals(v.getPersistentDataContainer().get(npcRoleKey, PersistentDataType.STRING))) {
-                npcFound = true;
-                break;
+        if (l1.isChunkLoaded(npcLoc.getBlockX() >> 4, npcLoc.getBlockZ() >> 4)) {
+            String expectedRole = zone.name();
+            Villager existing = null;
+            for (Entity e : l1.getNearbyEntities(npcLoc, 10.0, 5.0, 10.0)) {
+                if (e instanceof Villager v && expectedRole.equals(v.getPersistentDataContainer().get(npcRoleKey, PersistentDataType.STRING))) {
+                    if (existing == null) {
+                        existing = v;
+                    } else {
+                        v.remove();
+                    }
+                }
             }
-        }
-        if (!npcFound) {
-            spawnOutpostNpc(npcLoc, zone);
+            if (existing == null) {
+                spawnOutpostNpc(npcLoc, zone);
+            }
         }
         ensureOutpostSoldiersAtRegion(l1, zone, rx, rz);
     }
@@ -713,6 +712,7 @@ public final class Level1Manager implements Listener {
             v.setInvulnerable(true);
             v.setSilent(true);
             v.setRemoveWhenFarAway(false);
+            v.setPersistent(false);
             v.getPersistentDataContainer().set(npcRoleKey, PersistentDataType.STRING, zone.name());
 
             BackroomsItems items = plugin.getItems();
