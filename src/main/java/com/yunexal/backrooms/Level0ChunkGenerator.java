@@ -3,6 +3,9 @@ package com.yunexal.backrooms;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.Bisected;
+import org.bukkit.block.data.type.Stairs;
 import org.bukkit.entity.Player;
 import org.bukkit.generator.BiomeProvider;
 import org.bukkit.generator.BlockPopulator;
@@ -39,6 +42,7 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
     public enum ZoneType {
         CLASSIC_MAZE,
         PILLAR_HALL,
+        PITFALL_HALL,
         NARROW_MAZE,
         BLACKOUT_ZONE,
         MANILA_ROOM,
@@ -116,32 +120,51 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
                 int cz = Math.floorDiv(wz, CELL_SIZE);
                 int inCellZ = Math.floorMod(wz, CELL_SIZE);
 
-                // 1. Subfloor & roof bedrock seal so sky/void is completely invisible and unreachable.
-                chunkData.setBlock(lx, floorY - 2, lz, Material.BEDROCK);
-                chunkData.setBlock(lx, floorY - 1, lz, Material.BEDROCK);
+                ZoneType zone = getZoneType(seed, cx, cz);
+                boolean solidWall = isWallBlock(seed, cx, cz, inCellX, inCellZ, zone);
+                int rlx = Math.floorMod(cx, REGION_CELLS);
+                int rlz = Math.floorMod(cz, REGION_CELLS);
+                boolean pitfallHallInterior = (zone == ZoneType.PITFALL_HALL
+                        && rlx >= 1 && rlx <= 6 && rlz >= 1 && rlz <= 6);
+                boolean pitfallShaft = pitfallHallInterior
+                        && rlx >= 2 && rlx <= 5 && rlz >= 2 && rlz <= 5
+                        && (inCellX == 1 || inCellX == 2) && (inCellZ == 1 || inCellZ == 2);
+
+                // 1. Subfloor & roof bedrock seal (or Pitfall Hall under-floor crawlspace & shafts).
+                if (pitfallHallInterior) {
+                    chunkData.setBlock(lx, floorY - 11, lz, Material.BEDROCK);
+                    chunkData.setBlock(lx, floorY - 10, lz, Material.BLACK_CONCRETE);
+                    for (int y = floorY - 6; y <= floorY - 1; y++) {
+                        if (!pitfallShaft) {
+                            chunkData.setBlock(lx, y, lz, Material.BROWN_TERRACOTTA);
+                        }
+                    }
+                } else {
+                    chunkData.setBlock(lx, floorY - 2, lz, Material.BEDROCK);
+                    chunkData.setBlock(lx, floorY - 1, lz, Material.BEDROCK);
+                }
                 chunkData.setBlock(lx, ceilingY + 1, lz, Material.BEDROCK);
                 chunkData.setBlock(lx, ceilingY + 2, lz, Material.BEDROCK);
 
-                ZoneType zone = getZoneType(seed, cx, cz);
-                boolean solidWall = isWallBlock(seed, cx, cz, inCellX, inCellZ, zone);
-
-                // 2. Floor material (damp wool carpet, crimson carpet in Red Rooms, or rare soft carpet noclip spot).
-                Material floorMat;
-                if (zone == ZoneType.RED_ROOM) {
-                    floorMat = Material.RED_WOOL;
-                } else if (!solidWall && isNaturalNoclipSpot(seed, config, cx, cz, wx, wz, zone)) {
-                    floorMat = Material.GRAY_WOOL;
-                } else {
-                    floorMat = Material.BROWN_WOOL;
+                // 2. Floor material (damp wool carpet, crimson carpet in Red Rooms, pitfall opening, or soft carpet).
+                if (!pitfallShaft) {
+                    Material floorMat;
+                    if (zone == ZoneType.RED_ROOM) {
+                        floorMat = Material.RED_WOOL;
+                    } else if (!solidWall && !pitfallHallInterior && isNaturalNoclipSpot(seed, config, cx, cz, wx, wz, zone)) {
+                        floorMat = Material.GRAY_WOOL;
+                    } else {
+                        floorMat = Material.BROWN_WOOL;
+                    }
+                    chunkData.setBlock(lx, floorY, lz, floorMat);
                 }
-                chunkData.setBlock(lx, floorY, lz, floorMat);
 
                 if (solidWall) {
                     boolean corner = (inCellX == 0 && inCellZ == 0);
                     buildWallColumn(chunkData, config, lx, lz, floorY, ceilingY, seed, wx, wz, cx, cz, inCellX, inCellZ, corner, zone);
                 }
 
-                // 3. Drop ceiling, fixtures, and rare missing ceiling tile openings exposing dark plenum.
+                // 3. Solid drop ceiling & recessed fluorescent fixtures (no broken ceiling holes).
                 if (inCellX == 2 && inCellZ == 2 && !solidWall) {
                     LightState light = getLightState(seed, config, cx, cz, zone);
                     Material ceilingMat;
@@ -156,11 +179,6 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
                         };
                     }
                     chunkData.setBlock(lx, ceilingY, lz, ceilingMat);
-                } else if (!solidWall && zone != ZoneType.MANILA_ROOM && (Math.abs(cx) > 1 || Math.abs(cz) > 1)
-                        && toUnitDouble(mix64(seed ^ 0x7137449123EF65CDL, wx, wz)) < 0.014) {
-                    // Missing drop-ceiling acoustic tile revealing dark void plenum above
-                    chunkData.setBlock(lx, ceilingY, lz, Material.AIR);
-                    chunkData.setBlock(lx, ceilingY + 1, lz, Material.BLACK_CONCRETE);
                 } else {
                     chunkData.setBlock(lx, ceilingY, lz, Material.CALCITE);
                 }
@@ -186,19 +204,36 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             return;
         }
 
-        // Architectural openings (pass-through archways & waist-high office cutouts) on non-corner wall panels
-        if (!corner && zone != ZoneType.PILLAR_HALL) {
-            int posInPanel = (inCellX == 0) ? inCellZ : inCellX;
+        // Arched half-wall partitions (waist-high wall + arched colonnade cutout) in Pillar Halls & select corridors
+        if (!corner && zone != ZoneType.PITFALL_HALL) {
+            boolean northWall = (inCellZ == 0);
+            int posInPanel = northWall ? inCellX : inCellZ;
+            int rlx = Math.floorMod(cx, REGION_CELLS);
+            int rlz = Math.floorMod(cz, REGION_CELLS);
+            boolean interiorPillarPartition = (zone == ZoneType.PILLAR_HALL)
+                    && ((northWall && rlz >= 1 && rlz <= 7) || (!northWall && rlx >= 1 && rlx <= 7));
+
             long panelSeed = mix64(seed ^ 0x6A09E667F3BCC908L, cx * 2 + (inCellX == 0 ? 0 : 1), cz);
             double openRoll = toUnitDouble(panelSeed);
-            if (openRoll < 0.09 && (posInPanel == 2 || posInPanel == 3)) {
-                // 2-block-wide pass-through archway (3 blocks tall, header lintel at top)
+
+            if (interiorPillarPartition || (openRoll >= 0.08 && openRoll < 0.16)) {
+                // Iconic arched office partition: solid half-wall at bottom, arched cutout, solid lintel at top
+                chunkData.setBlock(lx, floorY + 1, lz, Material.ORANGE_TERRACOTTA);
                 chunkData.setBlock(lx, ceilingY - 1, lz, Material.YELLOW_TERRACOTTA);
+                if (posInPanel == 1 || posInPanel == 3) {
+                    Stairs arch = (Stairs) Material.SMOOTH_SANDSTONE_STAIRS.createBlockData();
+                    arch.setHalf(Bisected.Half.TOP);
+                    if (northWall) {
+                        arch.setFacing(posInPanel == 1 ? BlockFace.WEST : BlockFace.EAST);
+                    } else {
+                        arch.setFacing(posInPanel == 1 ? BlockFace.NORTH : BlockFace.SOUTH);
+                    }
+                    chunkData.setBlock(lx, ceilingY - 2, lz, arch);
+                }
                 return;
             }
-            if (openRoll >= 0.09 && openRoll < 0.14 && posInPanel == 2) {
-                // Office partition cutout window (solid baseboard + top lintel, open eye-level gap)
-                chunkData.setBlock(lx, floorY + 1, lz, Material.ORANGE_TERRACOTTA);
+            if (openRoll < 0.08 && (posInPanel == 2 || posInPanel == 3)) {
+                // 2-block-wide pass-through archway (3 blocks tall, header lintel at top)
                 chunkData.setBlock(lx, ceilingY - 1, lz, Material.YELLOW_TERRACOTTA);
                 return;
             }
@@ -292,9 +327,17 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             if (zone == ZoneType.MANILA_ROOM && rlx >= 3 && rlx <= 4 && rlz >= 3 && rlz <= 4) {
                 return false;
             }
+            // Keep Pitfall Hall interior floor open around the 4x4 grid of square pitfall shafts
+            if (zone == ZoneType.PITFALL_HALL && rlx >= 2 && rlx <= 6 && rlz >= 2 && rlz <= 6) {
+                return false;
+            }
             if (zone == ZoneType.PILLAR_HALL) {
+                if (hasWestWall(seed, cx, cz) || hasWestWall(seed, cx, cz - 1)
+                        || hasNorthWall(seed, cx, cz) || hasNorthWall(seed, cx - 1, cz)) {
+                    return true;
+                }
                 long h = mix64(seed ^ 0xA24BAED4963EE407L, cx, cz);
-                return toUnitDouble(h) > 0.16;
+                return toUnitDouble(h) > 0.18;
             }
             boolean w1 = hasWestWall(seed, cx, cz);
             boolean w2 = hasWestWall(seed, cx, cz - 1);
@@ -401,7 +444,8 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         }
 
         double braidChance = switch (zone) {
-            case PILLAR_HALL -> 0.90;
+            case PILLAR_HALL -> 0.88;
+            case PITFALL_HALL -> 0.50;
             case NARROW_MAZE -> config.getExtraBraidingChance() * 0.45;
             case BLACKOUT_ZONE -> config.getExtraBraidingChance() * 1.10;
             case RED_ROOM -> config.getExtraBraidingChance() * 0.90;
@@ -421,6 +465,43 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
                 if (plan.northWall[x][z] && rng.nextDouble() < braidChance) {
                     plan.northWall[x][z] = false;
                 }
+            }
+        }
+
+        // Long repeating arched colonnade partition wall inside Pillar Halls
+        if (zone == ZoneType.PILLAR_HALL) {
+            boolean alongZ = rng.nextBoolean();
+            int lineIdx = 2 + rng.nextInt(4);
+            if (alongZ) {
+                for (int z = 1; z <= 6; z++) {
+                    plan.westWall[lineIdx][z] = true;
+                }
+            } else {
+                for (int x = 1; x <= 6; x++) {
+                    plan.northWall[x][lineIdx] = true;
+                }
+            }
+        }
+
+        // Open Pitfalls Hall (cells 1..6 x 1..6) with wide 2-cell doorways into the pitfall grid
+        if (zone == ZoneType.PITFALL_HALL) {
+            for (int x = 2; x <= 6; x++) {
+                for (int z = 1; z <= 6; z++) {
+                    plan.westWall[x][z] = false;
+                }
+            }
+            for (int x = 1; x <= 6; x++) {
+                for (int z = 2; z <= 6; z++) {
+                    plan.northWall[x][z] = false;
+                }
+            }
+            for (int z = 1; z <= 6; z++) {
+                plan.westWall[1][z] = (z != 3 && z != 4);
+                plan.westWall[7][z] = (z != 3 && z != 4);
+            }
+            for (int x = 1; x <= 6; x++) {
+                plan.northWall[x][1] = (x != 3 && x != 4);
+                plan.northWall[x][7] = (x != 3 && x != 4);
             }
         }
 
@@ -523,6 +604,10 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         if (roll < acc) {
             return ZoneType.RED_ROOM;
         }
+        acc += 0.055;
+        if (roll < acc) {
+            return ZoneType.PITFALL_HALL;
+        }
         acc += pBlackout;
         if (roll < acc) {
             return ZoneType.BLACKOUT_ZONE;
@@ -563,7 +648,7 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             return LightState.NONE;
         }
 
-        if (zone == ZoneType.PILLAR_HALL) {
+        if (zone == ZoneType.PILLAR_HALL || zone == ZoneType.PITFALL_HALL) {
             if (roll < config.getFlickerLightChance()) {
                 return LightState.FLICKERING;
             }
