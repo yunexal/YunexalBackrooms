@@ -30,11 +30,11 @@ level0:
   spawn-radius: 3800
   random-spawn-on-every-join: false
   extra-braiding-chance: 0.34
-  pillar-hall-chance: 0.16
-  narrow-maze-chance: 0.18
-  blackout-zone-chance: 0.14
+  pillar-hall-chance: 0.20
+  narrow-maze-chance: 0.16
+  blackout-zone-chance: 0.15
   manila-room-chance: 0.008
-  red-room-chance: 0.007
+  red-room-chance: 0.015
   soft-carpet-chance: 0.0004
   non-linear-anomaly-chance: 0.004
   flicker-light-chance: 0.12

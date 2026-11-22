@@ -141,7 +141,7 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
                     buildWallColumn(chunkData, config, lx, lz, floorY, ceilingY, seed, wx, wz, cx, cz, inCellX, inCellZ, corner, zone);
                 }
 
-                // 3. Drop ceiling & ceiling fixtures.
+                // 3. Drop ceiling, fixtures, and rare missing ceiling tile openings exposing dark plenum.
                 if (inCellX == 2 && inCellZ == 2 && !solidWall) {
                     LightState light = getLightState(seed, config, cx, cz, zone);
                     Material ceilingMat;
@@ -156,6 +156,11 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
                         };
                     }
                     chunkData.setBlock(lx, ceilingY, lz, ceilingMat);
+                } else if (!solidWall && zone != ZoneType.MANILA_ROOM && (Math.abs(cx) > 1 || Math.abs(cz) > 1)
+                        && toUnitDouble(mix64(seed ^ 0x7137449123EF65CDL, wx, wz)) < 0.014) {
+                    // Missing drop-ceiling acoustic tile revealing dark void plenum above
+                    chunkData.setBlock(lx, ceilingY, lz, Material.AIR);
+                    chunkData.setBlock(lx, ceilingY + 1, lz, Material.BLACK_CONCRETE);
                 } else {
                     chunkData.setBlock(lx, ceilingY, lz, Material.CALCITE);
                 }
@@ -179,6 +184,24 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
                 chunkData.setBlock(lx, y, lz, Material.WHITE_TERRACOTTA);
             }
             return;
+        }
+
+        // Architectural openings (pass-through archways & waist-high office cutouts) on non-corner wall panels
+        if (!corner && zone != ZoneType.PILLAR_HALL) {
+            int posInPanel = (inCellX == 0) ? inCellZ : inCellX;
+            long panelSeed = mix64(seed ^ 0x6A09E667F3BCC908L, cx * 2 + (inCellX == 0 ? 0 : 1), cz);
+            double openRoll = toUnitDouble(panelSeed);
+            if (openRoll < 0.09 && (posInPanel == 2 || posInPanel == 3)) {
+                // 2-block-wide pass-through archway (3 blocks tall, header lintel at top)
+                chunkData.setBlock(lx, ceilingY - 1, lz, Material.YELLOW_TERRACOTTA);
+                return;
+            }
+            if (openRoll >= 0.09 && openRoll < 0.14 && posInPanel == 2) {
+                // Office partition cutout window (solid baseboard + top lintel, open eye-level gap)
+                chunkData.setBlock(lx, floorY + 1, lz, Material.ORANGE_TERRACOTTA);
+                chunkData.setBlock(lx, ceilingY - 1, lz, Material.YELLOW_TERRACOTTA);
+                return;
+            }
         }
 
         long colHash = mix64(seed ^ 0x517CC1B727220A95L, wx, wz);
@@ -251,6 +274,13 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
     }
 
     private boolean isWallBlock(long seed, int cx, int cz, int inCellX, int inCellZ, ZoneType zone) {
+        // Thick 2x2 structural pillars in select Pillar Hall bays
+        if (zone == ZoneType.PILLAR_HALL && inCellX <= 1 && inCellZ <= 1) {
+            double pRoll = toUnitDouble(mix64(seed ^ 0xA24BAED4963EE407L, cx, cz));
+            if (pRoll > 0.84) {
+                return true;
+            }
+        }
         if (inCellX > 0 && inCellZ > 0) {
             return false;
         }
@@ -371,7 +401,7 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         }
 
         double braidChance = switch (zone) {
-            case PILLAR_HALL -> 0.84;
+            case PILLAR_HALL -> 0.90;
             case NARROW_MAZE -> config.getExtraBraidingChance() * 0.45;
             case BLACKOUT_ZONE -> config.getExtraBraidingChance() * 1.10;
             case RED_ROOM -> config.getExtraBraidingChance() * 0.90;
