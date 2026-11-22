@@ -1,13 +1,13 @@
 # ============================================================
-# YUNEXAL BACKROOMS — Level 0 & Limbo Configuration (26.3)
+# YUNEXAL BACKROOMS — Level 0 («Лобі») & Limbo (Purpur 26.3)
 # ============================================================
 
 resource-pack:
   enabled: true
   url: "https://mirror.yunexal.com/packs/YunexalBackrooms-RP.zip"
-  sha1: "5295210c4396017ee6c4c3491c88dac7c879e7ce"
+  sha1: "b6f59acb38fc26a9921c3a9d975e648703942808"
   required: true
-  prompt: "&e&lYUNEXAL BACKROOMS\n&7Для входу на &fРівень 0 «Лобі» &7обов'язково прийміть ресурс-пак.\n&8Текстури шпалер, стелі, килиму та фоновий гул ламп."
+  prompt: "&e&lYUNEXAL BACKROOMS\n&7Для входу на &fРівень 0 «Лобі» &7обов'язково прийміть ресурс-пак.\n&8Кастомні текстури, Манільська та Червона кімнати, 48kHz аудіо."
   timeout-seconds: 45
   send-delay-ticks: 10
   fallback-server: "hub1"
@@ -21,14 +21,19 @@ limbo:
 
 level0:
   world-name: "world"
-  # 0 = брати seed світу; фіксоване значення дає стабільний детермінований лабіринт
   seed: 19780412
   floor-y: 64
   wall-height: 4
+  world-border-size: 10000.0
+  spawn-radius: 3800
   extra-braiding-chance: 0.34
   pillar-hall-chance: 0.16
   narrow-maze-chance: 0.18
   blackout-zone-chance: 0.14
+  manila-room-chance: 0.008
+  red-room-chance: 0.007
+  soft-carpet-chance: 0.0004
+  non-linear-anomaly-chance: 0.004
   flicker-light-chance: 0.12
   dead-light-chance: 0.10
   vent-chance: 0.045
@@ -36,6 +41,8 @@ level0:
 
 ambient:
   enabled: true
-  hum-interval-ticks: 140
-  flicker-sound-chance: 0.24
-  distant-thump-chance: 0.06
+  # 16s loop at 48kHz played every 15s (300 ticks) attached to player entity
+  hum-interval-ticks: 300
+  flicker-cooldown-seconds: 22
+  flicker-sound-chance: 0.12
+  distant-thump-chance: 0.015

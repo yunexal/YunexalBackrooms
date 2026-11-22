@@ -30,18 +30,32 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
             BackroomsConfig cfg = plugin.getBackroomsConfig();
             sender.sendMessage(Component.text("YUNEXAL BACKROOMS ", NamedTextColor.YELLOW)
                     .append(Component.text("• Рівень 0 «Лобі»", NamedTextColor.GRAY)));
+            sender.sendMessage(Component.text("Клас виживання: ", NamedTextColor.GRAY)
+                    .append(Component.text("1 (Мінімум сутностей, нелінійний простір)", NamedTextColor.YELLOW)));
             sender.sendMessage(Component.text("Ресурс-пак: ", NamedTextColor.GRAY)
-                    .append(Component.text(cfg.isRpEnabled() ? "Обов'язковий (" + cfg.getRpUrl() + ")" : "Вимкнений", NamedTextColor.AQUA)));
-            if (sender instanceof Player p) {
+                    .append(Component.text(cfg.isRpEnabled() ? "Увімкнений (обов'язковий)" : "Вимкнений", NamedTextColor.AQUA)));
+            sender.sendMessage(Component.text("Рецепти: ", NamedTextColor.GRAY)
+                    .append(Component.text("/br craft", NamedTextColor.GOLD))
+                    .append(Component.text(" | Хаб: ", NamedTextColor.GRAY))
+                    .append(Component.text("/br hub", NamedTextColor.AQUA)));
+            if (sender.hasPermission("yunexal.backrooms.admin") && sender instanceof Player p && plugin.getLevel0World() != null && p.getWorld().equals(plugin.getLevel0World())) {
                 Location l = p.getLocation();
-                sender.sendMessage(Component.text("Світ: " + l.getWorld().getName()
-                        + " | X=" + l.getBlockX() + " Y=" + l.getBlockY() + " Z=" + l.getBlockZ(), NamedTextColor.WHITE));
+                Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator().getZoneAtBlock(l.getWorld(), l.getBlockX(), l.getBlockZ());
+                sender.sendMessage(Component.text("[Admin] Поточний сектор: " + zone.name(), NamedTextColor.DARK_GRAY));
             }
             return true;
         }
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
+            case "craft", "recipes" -> {
+                if (sender instanceof Player p) {
+                    plugin.getCraftingManager().sendRecipeGuide(p);
+                } else {
+                    sender.sendMessage(Component.text("Команда лише для гравців.", NamedTextColor.RED));
+                }
+                return true;
+            }
             case "hub", "leave" -> {
                 if (!(sender instanceof Player p)) {
                     sender.sendMessage(Component.text("Команда лише для гравців.", NamedTextColor.RED));
@@ -89,14 +103,15 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
                 } else {
                     World w = plugin.getLevel0World();
                     if (w != null) {
-                        p.teleport(plugin.getLevel0Generator().findSafeSpawn(w));
+                        p.teleport(plugin.getLevel0Generator().findRandomFarSpawn(
+                                w, Bukkit.getOnlinePlayers(), plugin.getBackroomsConfig().getSpawnRadius()));
                         p.sendMessage(Component.text("Телепортація на Рівень 0 «Лобі».", NamedTextColor.YELLOW));
                     }
                 }
                 return true;
             }
             default -> {
-                sender.sendMessage(Component.text("Використання: /br <info|hub|reload|reloadrp|tp>", NamedTextColor.YELLOW));
+                sender.sendMessage(Component.text("Використання: /br <info|craft|hub|reload|reloadrp|tp>", NamedTextColor.YELLOW));
                 return true;
             }
         }
@@ -107,9 +122,9 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
                                                 @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
             if (sender.hasPermission("yunexal.backrooms.admin")) {
-                return List.of("info", "hub", "reload", "reloadrp", "tp");
+                return List.of("info", "craft", "hub", "reload", "reloadrp", "tp");
             }
-            return List.of("info", "hub");
+            return List.of("info", "craft", "hub");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("tp") && sender.hasPermission("yunexal.backrooms.admin")) {
             return List.of("level0", "limbo");

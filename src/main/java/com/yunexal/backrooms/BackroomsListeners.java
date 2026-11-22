@@ -2,50 +2,86 @@ package com.yunexal.backrooms;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
-import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.block.Barrel;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.type.Candle;
+import org.bukkit.block.data.type.Light;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
-import org.bukkit.event.player.PlayerPortalEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.scoreboard.Criteria;
-import org.bukkit.scoreboard.DisplaySlot;
-import org.bukkit.scoreboard.Objective;
-import org.bukkit.scoreboard.Scoreboard;
-import org.bukkit.scoreboard.Team;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Handles Level 0 ambient 60Hz fluorescent hum, lamp flicker audio, protection, and sidebar HUD.
+ * Handles canonical Level 0 gameplay: entity-attached ambient hum & lamp-anchored flicker,
+ * Red Room dread, soft-carpet noclip, rare non-linear space shifts, Adventure scavenging,
+ * flashlight light projection, and privacy without scoreboards or coordinates.
  */
 public final class BackroomsListeners implements Listener {
     private final YunexalBackroomsPlugin plugin;
-    private final Map<UUID, Integer> humTickCounter = new ConcurrentHashMap<>();
+    private final NamespacedKey manilaStockedKey;
+    private final NamespacedKey manilaOpenedKey;
+
+    private final Map<UUID, Long> lastHumAtMs = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastFlickerAtMs = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastRedPulseAtMs = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastInteractAtMs = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastAnomalyAtMs = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastNoclipAtMs = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> playerCellKey = new ConcurrentHashMap<>();
+    private final Map<UUID, Location> activeFlashlightLoc = new ConcurrentHashMap<>();
+    private final Map<BlockKey, Integer> ventHitProgress = new ConcurrentHashMap<>();
 
     private BukkitTask ambientTask;
+    private BukkitTask flashlightTask;
+    private BukkitTask autosaveTask;
+
+    private record BlockKey(UUID worldId, int x, int y, int z) {}
 
     public BackroomsListeners(YunexalBackroomsPlugin plugin) {
         this.plugin = plugin;
+        this.manilaStockedKey = new NamespacedKey(plugin, "manila_stocked");
+        this.manilaOpenedKey = new NamespacedKey(plugin, "manila_opened");
     }
 
     public void start() {
-        if (ambientTask != null) {
-            ambientTask.cancel();
-        }
-        ambientTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickPlayers, 20L, 20L);
+        shutdown();
+        ambientTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickAmbient, 20L, 20L);
+        flashlightTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickFlashlights, 3L, 3L);
+        autosaveTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> plugin.getPlayerData().saveAllOnline(), 1200L, 1200L);
     }
 
     public void shutdown() {
@@ -53,143 +89,526 @@ public final class BackroomsListeners implements Listener {
             ambientTask.cancel();
             ambientTask = null;
         }
-        humTickCounter.clear();
+        if (flashlightTask != null) {
+            flashlightTask.cancel();
+            flashlightTask = null;
+        }
+        if (autosaveTask != null) {
+            autosaveTask.cancel();
+            autosaveTask = null;
+        }
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            restoreFlashlight(p);
+        }
+        activeFlashlightLoc.clear();
+        lastHumAtMs.clear();
+        lastFlickerAtMs.clear();
+        lastRedPulseAtMs.clear();
+        lastInteractAtMs.clear();
+        lastAnomalyAtMs.clear();
+        lastNoclipAtMs.clear();
+        playerCellKey.clear();
+        ventHitProgress.clear();
     }
 
-    private void tickPlayers() {
+    public void clearPlayerState(Player player) {
+        restoreFlashlight(player);
+        UUID uid = player.getUniqueId();
+        lastHumAtMs.remove(uid);
+        lastFlickerAtMs.remove(uid);
+        lastRedPulseAtMs.remove(uid);
+        lastInteractAtMs.remove(uid);
+        lastAnomalyAtMs.remove(uid);
+        lastNoclipAtMs.remove(uid);
+        playerCellKey.remove(uid);
+    }
+
+    private void tickAmbient() {
         BackroomsConfig cfg = plugin.getBackroomsConfig();
         World level0 = plugin.getLevel0World();
-        if (level0 == null) {
+        if (level0 == null || !cfg.isAmbientEnabled()) {
             return;
         }
 
-        int humPeriodSeconds = (int) Math.max(2L, cfg.getHumIntervalTicks() / 20L);
+        long now = System.currentTimeMillis();
+        long humIntervalMs = cfg.getHumIntervalTicks() * 50L;
+        long flickerCooldownMs = cfg.getFlickerCooldownSeconds() * 1000L;
+        int ceilingY = cfg.getCeilingY();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
-                continue;
-            }
             if (!player.getWorld().equals(level0)) {
                 continue;
             }
-
-            // Keep void safety inside sealed floorY..ceilingY
-            if (player.getLocation().getY() < cfg.getFloorY() - 3.0) {
-                player.teleport(plugin.getLevel0Generator().findSafeSpawn(level0));
-            }
-
-            updateScoreboard(player);
-
-            if (!cfg.isAmbientEnabled()) {
+            if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
                 continue;
             }
 
             UUID uid = player.getUniqueId();
-            int counter = humTickCounter.getOrDefault(uid, humPeriodSeconds);
-            if (counter >= humPeriodSeconds) {
-                player.playSound(player.getLocation(), "minecraft:backrooms.ambient.hum", SoundCategory.AMBIENT, 0.28f, 1.0f);
-                humTickCounter.put(uid, 1);
-            } else {
-                humTickCounter.put(uid, counter + 1);
+            Location loc = player.getLocation();
+            Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator()
+                    .getZoneAtBlock(level0, loc.getBlockX(), loc.getBlockZ());
+
+            if (zone == Level0ChunkGenerator.ZoneType.RED_ROOM) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 85, 0, false, false, false));
+                long prevPulse = lastRedPulseAtMs.getOrDefault(uid, 0L);
+                if (now - prevPulse >= 4200L) {
+                    lastRedPulseAtMs.put(uid, now);
+                    player.playSound(player, "minecraft:backrooms.ambient.red_pulse", SoundCategory.AMBIENT, 0.65f, 1.0f);
+                }
+                continue;
             }
 
-            // Spatial flicker audio near buzzing SEA_LANTERN lamps
-            if (rng.nextDouble() < cfg.getFlickerSoundChance()) {
-                Location flickerLoc = findNearbyFlickerLamp(player.getLocation(), cfg.getCeilingY());
-                if (flickerLoc != null) {
-                    player.playSound(flickerLoc, "minecraft:backrooms.ambient.flicker", SoundCategory.AMBIENT, 0.42f,
-                            0.94f + rng.nextFloat() * 0.12f);
+            // Head-attached 60/100Hz fluorescent hum (never jumps spatially while moving)
+            long prevHum = lastHumAtMs.getOrDefault(uid, 0L);
+            if (now - prevHum >= humIntervalMs) {
+                lastHumAtMs.put(uid, now);
+                float volume = (zone == Level0ChunkGenerator.ZoneType.BLACKOUT_ZONE) ? 0.22f
+                        : (zone == Level0ChunkGenerator.ZoneType.MANILA_ROOM ? 0.28f : 0.48f);
+                player.playSound(player, "minecraft:backrooms.ambient.hum", SoundCategory.AMBIENT, volume, 1.0f);
+            }
+
+            // Rare flickering buzz pinned strictly to an actual nearby SEA_LANTERN fixture coordinate
+            long prevFlicker = lastFlickerAtMs.getOrDefault(uid, 0L);
+            if (now - prevFlicker >= flickerCooldownMs && rng.nextDouble() < cfg.getFlickerSoundChance()) {
+                Location lampLoc = findNearestFlickeringLamp(level0, loc.getBlockX(), ceilingY, loc.getBlockZ());
+                if (lampLoc != null) {
+                    lastFlickerAtMs.put(uid, now);
+                    player.playSound(lampLoc, "minecraft:backrooms.ambient.flicker", SoundCategory.BLOCKS, 0.42f, 1.0f);
                 }
             }
 
-            // Rare distant muffled structural thump
-            if (rng.nextDouble() < cfg.getDistantThumpChance()) {
+            // Rare distant thump echoing from a corridor direction (skipped in quiet Manila Room)
+            if (zone != Level0ChunkGenerator.ZoneType.MANILA_ROOM && rng.nextDouble() < cfg.getDistantThumpChance()) {
                 double angle = rng.nextDouble() * Math.PI * 2.0;
                 double dist = 12.0 + rng.nextDouble() * 8.0;
-                Location thumpLoc = player.getLocation().clone().add(Math.cos(angle) * dist, 0.5, Math.sin(angle) * dist);
-                player.playSound(thumpLoc, "minecraft:backrooms.ambient.thump", SoundCategory.AMBIENT, 0.25f,
-                        0.82f + rng.nextFloat() * 0.18f);
+                Location soundLoc = loc.clone().add(Math.cos(angle) * dist, 0.5, Math.sin(angle) * dist);
+                player.playSound(soundLoc, "minecraft:backrooms.ambient.thump", SoundCategory.AMBIENT, 0.35f,
+                        0.82f + rng.nextFloat() * 0.22f);
             }
         }
     }
 
-    private Location findNearbyFlickerLamp(Location center, int ceilingY) {
-        World w = center.getWorld();
-        int bx = center.getBlockX();
-        int bz = center.getBlockZ();
-        for (int dx = -8; dx <= 8; dx += 2) {
-            for (int dz = -8; dz <= 8; dz += 2) {
-                if (w.getBlockAt(bx + dx, ceilingY, bz + dz).getType() == Material.SEA_LANTERN) {
-                    return new Location(w, bx + dx + 0.5, ceilingY + 0.2, bz + dz + 0.5);
+    private Location findNearestFlickeringLamp(World world, int px, int ceilingY, int pz) {
+        Location best = null;
+        int bestDistSq = Integer.MAX_VALUE;
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                if (world.getBlockAt(px + dx, ceilingY, pz + dz).getType() == Material.SEA_LANTERN) {
+                    int dSq = dx * dx + dz * dz;
+                    if (dSq < bestDistSq) {
+                        bestDistSq = dSq;
+                        best = new Location(world, px + dx + 0.5, ceilingY + 0.5, pz + dz + 0.5);
+                    }
                 }
             }
         }
-        return null;
+        return best;
     }
 
-    public void updateScoreboard(Player player) {
-        if (plugin.getLimboManager().isInLimbo(player)) {
+    private void tickFlashlights() {
+        World level0 = plugin.getLevel0World();
+        if (level0 == null) {
             return;
         }
-        Location loc = player.getLocation();
-        Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator()
-                .getZoneAtBlock(loc.getWorld(), loc.getBlockX(), loc.getBlockZ());
-        String zoneLabel = switch (zone) {
-            case CLASSIC_MAZE -> "§eКоридори Лобі";
-            case PILLAR_HALL -> "§6Колонна зала";
-            case NARROW_MAZE -> "§cТісний лабіринт";
-            case BLACKOUT_ZONE -> "§8Темний сектор";
-        };
-        String coordsLine = "  §fX: §7" + loc.getBlockX() + "  §fZ: §7" + loc.getBlockZ();
+        BackroomsItems items = plugin.getItems();
 
-        Scoreboard sb = player.getScoreboard();
-        Objective obj = sb.getObjective("backrooms");
-        if (obj == null) {
-            sb = Bukkit.getScoreboardManager().getNewScoreboard();
-            obj = sb.registerNewObjective("backrooms", Criteria.DUMMY,
-                    Component.text("§e§lYUNEXAL §8// §6BACKROOMS"));
-            obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!player.getWorld().equals(level0)
+                    || plugin.getLimboManager().isInLimbo(player)
+                    || !plugin.getLimboManager().isVerified(player)) {
+                restoreFlashlight(player);
+                continue;
+            }
 
-            Team sectorTeam = sb.registerNewTeam("br_sector");
-            sectorTeam.addEntry("§1 ");
-            obj.getScore("§1 ").setScore(6);
+            boolean holdingLight = items.isItem(player.getInventory().getItemInMainHand(), BackroomsItems.ID_FLASHLIGHT)
+                    || items.isItem(player.getInventory().getItemInOffHand(), BackroomsItems.ID_FLASHLIGHT);
+            if (!holdingLight) {
+                restoreFlashlight(player);
+                continue;
+            }
 
-            Team coordsTeam = sb.registerNewTeam("br_coords");
-            coordsTeam.addEntry("§2 ");
-            obj.getScore("§2 ").setScore(4);
+            Location target = pickLightTarget(player);
+            if (target == null) {
+                restoreFlashlight(player);
+                continue;
+            }
 
-            obj.getScore("§7 ").setScore(10);
-            obj.getScore("§8▎ §eЛокація:").setScore(9);
-            obj.getScore("  §fРівень 0 §7«Лобі»").setScore(8);
-            obj.getScore("§8▎ §eСектор:").setScore(7);
-            obj.getScore("§8▎ §eКоординати:").setScore(5);
-            obj.getScore("§0 ").setScore(3);
-            obj.getScore("§8▎ §b/br hub §7— в хаб").setScore(2);
-            obj.getScore("§7play.yunexal.com").setScore(1);
+            Location prev = activeFlashlightLoc.get(player.getUniqueId());
+            if (prev != null && prev.getWorld().equals(target.getWorld())
+                    && prev.getBlockX() == target.getBlockX()
+                    && prev.getBlockY() == target.getBlockY()
+                    && prev.getBlockZ() == target.getBlockZ()) {
+                continue;
+            }
 
-            player.setScoreboard(sb);
-        }
-
-        Team sectorTeam = sb.getTeam("br_sector");
-        if (sectorTeam != null) {
-            sectorTeam.prefix(Component.text("  " + zoneLabel));
-        }
-        Team coordsTeam = sb.getTeam("br_coords");
-        if (coordsTeam != null) {
-            coordsTeam.prefix(Component.text(coordsLine));
+            restoreFlashlight(player);
+            Light lightData = (Light) Material.LIGHT.createBlockData();
+            lightData.setLevel(12);
+            player.sendBlockChange(target, lightData);
+            activeFlashlightLoc.put(player.getUniqueId(), target);
         }
     }
 
-    @EventHandler
+    private Location pickLightTarget(Player player) {
+        Location eye = player.getEyeLocation();
+        Location ahead = eye.clone().add(eye.getDirection().multiply(2.0));
+        Block b = ahead.getBlock();
+        if (b.getType().isAir()) {
+            return b.getLocation();
+        }
+        Block eyeBlock = eye.getBlock();
+        return eyeBlock.getType().isAir() ? eyeBlock.getLocation() : null;
+    }
+
+    private void restoreFlashlight(Player player) {
+        Location old = activeFlashlightLoc.remove(player.getUniqueId());
+        if (old != null && old.getWorld() != null) {
+            player.sendBlockChange(old, old.getBlock().getBlockData());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        World level0 = plugin.getLevel0World();
+        if (level0 == null || !player.getWorld().equals(level0)) {
+            return;
+        }
+        if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
+            return;
+        }
+
+        Location to = event.getTo();
+        Location from = event.getFrom();
+        if (from.getBlockX() == to.getBlockX() && from.getBlockZ() == to.getBlockZ()) {
+            return;
+        }
+
+        BackroomsConfig cfg = plugin.getBackroomsConfig();
+        long now = System.currentTimeMillis();
+        UUID uid = player.getUniqueId();
+        int floorY = cfg.getFloorY();
+        int bx = to.getBlockX();
+        int bz = to.getBlockZ();
+
+        // 1. Canonical soft-carpet noclip spot
+        Block floorBlock = level0.getBlockAt(bx, floorY, bz);
+        if (floorBlock.getType() == Material.GRAY_WOOL
+                && plugin.getLevel0Generator().isNaturalNoclipSpot(level0, bx, bz)) {
+            if (now - lastNoclipAtMs.getOrDefault(uid, 0L) >= 6000L) {
+                lastNoclipAtMs.put(uid, now);
+                triggerSoftCarpetNoclip(player, level0);
+                return;
+            }
+        }
+
+        // 2. Very rare non-linear spatial shift when crossing macro-cell boundaries
+        int newCx = Math.floorDiv(bx, Level0ChunkGenerator.CELL_SIZE);
+        int newCz = Math.floorDiv(bz, Level0ChunkGenerator.CELL_SIZE);
+        long cellPacked = (((long) newCx) << 32) ^ (newCz & 0xFFFFFFFFL);
+        Long prevPacked = playerCellKey.put(uid, cellPacked);
+        if (prevPacked == null || prevPacked == cellPacked) {
+            return;
+        }
+
+        if (now - lastAnomalyAtMs.getOrDefault(uid, 0L) < 90_000L) {
+            return;
+        }
+        if (Math.abs(newCx) <= 3 && Math.abs(newCz) <= 3) {
+            return;
+        }
+
+        Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator().getZoneAtBlock(level0, bx, bz);
+        if (zone == Level0ChunkGenerator.ZoneType.MANILA_ROOM || zone == Level0ChunkGenerator.ZoneType.RED_ROOM) {
+            return;
+        }
+
+        if (ThreadLocalRandom.current().nextDouble() < cfg.getNonLinearAnomalyChance()) {
+            lastAnomalyAtMs.put(uid, now);
+            Location shift = plugin.getLevel0Generator().findRandomFarSpawn(
+                    level0, Bukkit.getOnlinePlayers(), Math.min(cfg.getSpawnRadius(), 1200));
+            shift.setYaw(to.getYaw());
+            shift.setPitch(to.getPitch());
+            restoreFlashlight(player);
+            player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 14, 0, false, false, false));
+            player.teleport(shift);
+        }
+    }
+
+    private void triggerSoftCarpetNoclip(Player player, World level0) {
+        restoreFlashlight(player);
+        player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.9f, 1.0f);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 36, 0, false, false, false));
+        player.showTitle(Title.title(
+                Component.text("МЕЖА РІВНЯ 1", NamedTextColor.GRAY, TextDecoration.BOLD),
+                Component.text("«Житлова зона» у розробці — вас відкинуло назад у Лобі", NamedTextColor.DARK_GRAY),
+                Title.Times.times(Duration.ofMillis(200), Duration.ofSeconds(3), Duration.ofMillis(700))
+        ));
+        Location nextSpot = plugin.getLevel0Generator().findRandomFarSpawn(
+                level0, Bukkit.getOnlinePlayers(), plugin.getBackroomsConfig().getSpawnRadius());
+        player.teleport(nextSpot);
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
+        Player player = event.getPlayer();
+        World level0 = plugin.getLevel0World();
+        if (level0 == null || !player.getWorld().equals(level0)) {
+            return;
+        }
+        if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
+            return;
+        }
+
+        BackroomsItems items = plugin.getItems();
+        ItemStack held = player.getInventory().getItemInMainHand();
+        String heldId = items.getItemId(held);
+        Action action = event.getAction();
+        Block clicked = event.getClickedBlock();
+
+        // Allow native container/station usage cleanly, ensuring Manila barrel always has loot
+        if (action == Action.RIGHT_CLICK_BLOCK && clicked != null) {
+            if (clicked.getType() == Material.CRAFTING_TABLE) {
+                return;
+            }
+            if (clicked.getType() == Material.BARREL) {
+                if (clicked.getState() instanceof Barrel barrel
+                        && plugin.getLevel0Generator().getZoneAtBlock(level0, clicked.getX(), clicked.getZ())
+                        == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
+                    var pdc = barrel.getPersistentDataContainer();
+                    if (!pdc.has(manilaStockedKey, PersistentDataType.BYTE)
+                            || (!pdc.has(manilaOpenedKey, PersistentDataType.BYTE) && barrel.getInventory().isEmpty())) {
+                        Level0Populator.fillManilaBarrelLoot(barrel.getInventory(), barrel, ThreadLocalRandom.current(), items, manilaStockedKey);
+                        pdc.set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
+                        barrel.update(true, false);
+                    } else if (!pdc.has(manilaOpenedKey, PersistentDataType.BYTE)) {
+                        pdc.set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
+                        barrel.update(true, false);
+                    }
+                }
+                return;
+            }
+        }
+
+        // 1. Usable custom survival items on right-click
+        if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
+            if (BackroomsItems.ID_WORKBENCH.equals(heldId)) {
+                event.setCancelled(true);
+                player.openWorkbench(null, true);
+                return;
+            }
+            if (BackroomsItems.ID_BANDAGE.equals(heldId)) {
+                event.setCancelled(true);
+                applyBandage(player, held);
+                return;
+            }
+            if (BackroomsItems.ID_DAMP_WALLPAPER.equals(heldId)) {
+                event.setCancelled(true);
+                player.sendActionBar(Component.text("Волога рідина токсична! Просушіть її з сухими шпалерами.", NamedTextColor.RED));
+                return;
+            }
+            if (BackroomsItems.ID_MARKER.equals(heldId) && action == Action.RIGHT_CLICK_BLOCK && clicked != null) {
+                if (tryPlaceMarker(player, clicked, held)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
+
+        // 2. Scavenging Level 0 materials & picking up markers in Adventure mode
+        if (clicked == null || (action != Action.LEFT_CLICK_BLOCK && action != Action.RIGHT_CLICK_BLOCK)) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        UUID uid = player.getUniqueId();
+        if (now - lastInteractAtMs.getOrDefault(uid, 0L) < 220L) {
+            return;
+        }
+
+        if (handleBlockScavenge(player, clicked, heldId)) {
+            lastInteractAtMs.put(uid, now);
+            event.setCancelled(true);
+        }
+    }
+
+    private void applyBandage(Player player, ItemStack held) {
+        double maxHp = 20.0;
+        var attr = player.getAttribute(Attribute.MAX_HEALTH);
+        if (attr != null) {
+            maxHp = attr.getValue();
+        }
+        boolean hasNeg = player.hasPotionEffect(PotionEffectType.DARKNESS)
+                || player.hasPotionEffect(PotionEffectType.NAUSEA)
+                || player.hasPotionEffect(PotionEffectType.POISON);
+        if (player.getHealth() >= maxHp && !hasNeg) {
+            player.sendActionBar(Component.text("Здоров'я вже повне.", NamedTextColor.GRAY));
+            return;
+        }
+
+        player.setHealth(Math.min(maxHp, player.getHealth() + 6.0));
+        player.removePotionEffect(PotionEffectType.DARKNESS);
+        player.removePotionEffect(PotionEffectType.NAUSEA);
+        player.removePotionEffect(PotionEffectType.POISON);
+        consumeOne(player, held);
+        player.playSound(player, Sound.BLOCK_WOOL_PLACE, SoundCategory.PLAYERS, 0.7f, 1.25f);
+        player.sendActionBar(Component.text("Перев'язка: +6 HP", NamedTextColor.GREEN));
+    }
+
+    private boolean tryPlaceMarker(Player player, Block floor, ItemStack held) {
+        Material m = floor.getType();
+        if (m != Material.BROWN_WOOL && m != Material.GRAY_WOOL && m != Material.RED_WOOL) {
+            return false;
+        }
+        Block above = floor.getRelative(BlockFace.UP);
+        if (!above.getType().isAir()) {
+            return false;
+        }
+        above.setType(Material.YELLOW_CANDLE, false);
+        if (above.getBlockData() instanceof Candle candle) {
+            candle.setCandles(1);
+            candle.setLit(true);
+            above.setBlockData(candle, false);
+        }
+        consumeOne(player, held);
+        player.playSound(above.getLocation().add(0.5, 0.2, 0.5), Sound.BLOCK_CANDLE_PLACE, SoundCategory.BLOCKS, 0.8f, 1.0f);
+        return true;
+    }
+
+    private boolean handleBlockScavenge(Player player, Block block, String heldId) {
+        BackroomsItems items = plugin.getItems();
+        ThreadLocalRandom rng = ThreadLocalRandom.current();
+        boolean hasCrowbar = BackroomsItems.ID_CROWBAR.equals(heldId);
+        Material type = block.getType();
+        Location soundLoc = block.getLocation().add(0.5, 0.5, 0.5);
+
+        switch (type) {
+            case YELLOW_CANDLE -> {
+                block.setType(Material.AIR, false);
+                giveOrDrop(player, items.marker(1), soundLoc);
+                player.playSound(soundLoc, Sound.BLOCK_CANDLE_BREAK, SoundCategory.BLOCKS, 0.75f, 1.0f);
+                return true;
+            }
+            case YELLOW_TERRACOTTA -> {
+                block.setType(Material.LIGHT_GRAY_TERRACOTTA, false);
+                giveOrDrop(player, items.wallpaperScrap(1 + rng.nextInt(2)), soundLoc);
+                if (rng.nextDouble() < 0.12) {
+                    giveOrDrop(player, items.copperWire(1), soundLoc);
+                }
+                player.playSound(soundLoc, "minecraft:backrooms.fx.wallpaper_tear", SoundCategory.BLOCKS, 0.7f, 0.95f + rng.nextFloat() * 0.15f);
+                return true;
+            }
+            case ORANGE_TERRACOTTA -> {
+                block.setType(Material.LIGHT_GRAY_TERRACOTTA, false);
+                giveOrDrop(player, items.baseboardPlank(hasCrowbar ? 2 : 1), soundLoc);
+                if (rng.nextDouble() < 0.40) {
+                    giveOrDrop(player, items.wallpaperScrap(1), soundLoc);
+                }
+                player.playSound(soundLoc, "minecraft:backrooms.fx.wallpaper_tear", SoundCategory.BLOCKS, 0.75f, 0.85f + rng.nextFloat() * 0.1f);
+                return true;
+            }
+            case BROWN_TERRACOTTA -> {
+                block.setType(Material.LIGHT_GRAY_TERRACOTTA, false);
+                giveOrDrop(player, items.dampWallpaper(1), soundLoc);
+                if (block.getY() == plugin.getBackroomsConfig().getFloorY() + 1 && rng.nextDouble() < 0.50) {
+                    giveOrDrop(player, items.baseboardPlank(1), soundLoc);
+                }
+                player.playSound(soundLoc, "minecraft:backrooms.fx.wallpaper_tear", SoundCategory.BLOCKS, 0.65f, 0.75f);
+                return true;
+            }
+            case BROWN_WOOL -> {
+                block.setType(Material.GRAY_WOOL, false);
+                giveOrDrop(player, items.carpetFiber(1 + rng.nextInt(2)), soundLoc);
+                player.playSound(soundLoc, "minecraft:backrooms.fx.carpet_rip", SoundCategory.BLOCKS, 0.7f, 0.95f + rng.nextFloat() * 0.1f);
+                return true;
+            }
+            case IRON_BLOCK -> {
+                BlockKey key = new BlockKey(block.getWorld().getUID(), block.getX(), block.getY(), block.getZ());
+                if (!hasCrowbar) {
+                    int hits = ventHitProgress.getOrDefault(key, 0) + 1;
+                    if (hits < 2) {
+                        ventHitProgress.put(key, hits);
+                        player.playSound(soundLoc, Sound.BLOCK_METAL_HIT, SoundCategory.BLOCKS, 0.7f, 1.1f);
+                        player.sendActionBar(Component.text("Решітка піддається... вдарте ще раз (або ломом)", NamedTextColor.GRAY));
+                        return true;
+                    }
+                }
+                ventHitProgress.remove(key);
+                block.setType(Material.LIGHT_GRAY_TERRACOTTA, false);
+                giveOrDrop(player, items.metalPlate(hasCrowbar ? 2 : 1), soundLoc);
+                if (hasCrowbar || rng.nextDouble() < 0.35) {
+                    giveOrDrop(player, items.copperWire(1), soundLoc);
+                }
+                player.playSound(soundLoc, "minecraft:backrooms.fx.metal_pry", SoundCategory.BLOCKS, 0.75f, 0.95f);
+                return true;
+            }
+            case POLISHED_ANDESITE -> {
+                block.setType(Material.CALCITE, false);
+                giveOrDrop(player, items.lampShard(1), soundLoc);
+                if (rng.nextDouble() < 0.45) {
+                    giveOrDrop(player, items.copperWire(1), soundLoc);
+                }
+                player.playSound(soundLoc, "minecraft:backrooms.fx.metal_pry", SoundCategory.BLOCKS, 0.65f, 1.25f);
+                return true;
+            }
+            default -> {
+                return false;
+            }
+        }
+    }
+
+    private void consumeOne(Player player, ItemStack stack) {
+        if (stack.getAmount() <= 1) {
+            player.getInventory().setItemInMainHand(null);
+        } else {
+            stack.setAmount(stack.getAmount() - 1);
+        }
+    }
+
+    private void giveOrDrop(Player player, ItemStack stack, Location fallbackDrop) {
+        Map<Integer, ItemStack> overflow = player.getInventory().addItem(stack);
+        for (ItemStack rem : overflow.values()) {
+            player.getWorld().dropItemNaturally(fallbackDrop, rem);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockBreak(BlockBreakEvent event) {
+        if (!event.getPlayer().hasPermission("yunexal.backrooms.admin")) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockPlace(BlockPlaceEvent event) {
+        if (!event.getPlayer().hasPermission("yunexal.backrooms.admin")) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onDrop(PlayerDropItemEvent event) {
+        if (plugin.getLimboManager().isInLimbo(event.getPlayer())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onHunger(FoodLevelChangeEvent event) {
-        event.setCancelled(true);
-        if (event.getEntity() instanceof Player p) {
-            p.setFoodLevel(20);
+        if (event.getEntity() instanceof Player p && plugin.getLimboManager().isInLimbo(p)) {
+            event.setCancelled(true);
+            return;
+        }
+        // Keep saturation comfortable; survival stress comes from disorientation and Red Rooms
+        if (event.getFoodLevel() < 14) {
+            event.setFoodLevel(14);
         }
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player player && plugin.getLimboManager().isInLimbo(player)) {
             event.setCancelled(true);
@@ -197,23 +616,26 @@ public final class BackroomsListeners implements Listener {
     }
 
     @EventHandler
-    public void onBreak(BlockBreakEvent event) {
-        Player p = event.getPlayer();
-        if (p.getGameMode() != GameMode.CREATIVE || !p.hasPermission("yunexal.backrooms.admin")) {
-            event.setCancelled(true);
+    public void onDeath(PlayerDeathEvent event) {
+        event.deathMessage(null);
+    }
+
+    @EventHandler
+    public void onRespawn(PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        if (plugin.getLimboManager().isInLimbo(player)) {
+            event.setRespawnLocation(plugin.getLimboManager().getLimboSpawnLocation());
+            return;
+        }
+        World w = plugin.getLevel0World();
+        if (w != null) {
+            event.setRespawnLocation(plugin.getLevel0Generator().findRandomFarSpawn(
+                    w, Bukkit.getOnlinePlayers(), plugin.getBackroomsConfig().getSpawnRadius()));
         }
     }
 
     @EventHandler
-    public void onPlace(BlockPlaceEvent event) {
-        Player p = event.getPlayer();
-        if (p.getGameMode() != GameMode.CREATIVE || !p.hasPermission("yunexal.backrooms.admin")) {
-            event.setCancelled(true);
-        }
-    }
-
-    @EventHandler
-    public void onPortal(PlayerPortalEvent event) {
-        event.setCancelled(true);
+    public void onQuit(PlayerQuitEvent event) {
+        clearPlayerState(event.getPlayer());
     }
 }

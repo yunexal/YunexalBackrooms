@@ -37,8 +37,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Manages the isolated pitch-black Limbo chamber and mandatory Resource Pack gate.
- * Players spawn inside world_limbo and cannot enter Level 0 until SUCCESSFULLY_LOADED fires.
+ * Manages the isolated pitch-black Limbo chamber, mandatory Resource Pack gate,
+ * anonymous corridor visibility, and PlayerDataManager state transitions.
  */
 public final class LimboManager implements Listener {
     private final YunexalBackroomsPlugin plugin;
@@ -76,6 +76,7 @@ public final class LimboManager implements Listener {
         BackroomsConfig cfg = plugin.getBackroomsConfig();
         World existing = Bukkit.getWorld(cfg.getLimboWorldName());
         if (existing != null) {
+            applyLimboRules(existing);
             this.limboWorld = existing;
             this.cachedLimboSpawn = new Location(existing, cfg.getLimboSpawnX(), cfg.getLimboSpawnY(), cfg.getLimboSpawnZ(), 0f, 0f);
             buildLimboChamber(existing, cfg);
@@ -90,20 +91,25 @@ public final class LimboManager implements Listener {
 
         World created = creator.createWorld();
         if (created != null) {
-            created.setTime(18000L);
-            created.setDifficulty(Difficulty.PEACEFUL);
-            created.setGameRule(GameRules.ADVANCE_TIME, false);
-            created.setGameRule(GameRules.ADVANCE_WEATHER, false);
-            created.setGameRule(GameRules.SPAWN_MOBS, false);
-            created.setGameRule(GameRules.FALL_DAMAGE, false);
-            created.setGameRule(GameRules.SHOW_ADVANCEMENT_MESSAGES, false);
-            created.setGameRule(GameRules.SHOW_DEATH_MESSAGES, false);
-            created.setGameRule(GameRules.LOCATOR_BAR, false);
+            applyLimboRules(created);
             buildLimboChamber(created, cfg);
             this.limboWorld = created;
             this.cachedLimboSpawn = new Location(created, cfg.getLimboSpawnX(), cfg.getLimboSpawnY(), cfg.getLimboSpawnZ(), 0f, 0f);
         }
         return created;
+    }
+
+    private void applyLimboRules(World w) {
+        w.setTime(18000L);
+        w.setDifficulty(Difficulty.PEACEFUL);
+        w.setGameRule(GameRules.ADVANCE_TIME, false);
+        w.setGameRule(GameRules.ADVANCE_WEATHER, false);
+        w.setGameRule(GameRules.SPAWN_MOBS, false);
+        w.setGameRule(GameRules.FALL_DAMAGE, false);
+        w.setGameRule(GameRules.SHOW_ADVANCEMENT_MESSAGES, false);
+        w.setGameRule(GameRules.SHOW_DEATH_MESSAGES, false);
+        w.setGameRule(GameRules.LOCATOR_BAR, false);
+        w.setGameRule(GameRules.REDUCED_DEBUG_INFO, true);
     }
 
     private void buildLimboChamber(World world, BackroomsConfig cfg) {
@@ -126,8 +132,6 @@ public final class LimboManager implements Listener {
                 }
             }
         }
-        // Subtle solid floor right beneath spawn point
-        world.getBlockAt(cx, cy - 1, cz).setType(Material.BLACK_CONCRETE, false);
         for (int dx = -r + 1; dx < r; dx++) {
             for (int dz = -r + 1; dz < r; dz++) {
                 world.getBlockAt(cx + dx, cy - 1, cz + dz).setType(Material.BLACK_CONCRETE, false);
@@ -193,7 +197,6 @@ public final class LimboManager implements Listener {
         player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 20 * 120, 1, false, false, false));
         player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 20 * 120, 1, false, false, false));
 
-        // Isolate players inside Limbo so they cannot see anyone else waiting or in Level 0
         for (Player other : Bukkit.getOnlinePlayers()) {
             if (!other.equals(player)) {
                 player.hidePlayer(plugin, other);
@@ -202,51 +205,52 @@ public final class LimboManager implements Listener {
         }
 
         player.showTitle(Title.title(
-                Component.text("ЛІМБО", NamedTextColor.DARK_GRAY, TextDecoration.BOLD),
-                Component.text("Синхронізація текстур та звуку...", NamedTextColor.GRAY),
-                Title.Times.times(Duration.ofMillis(250), Duration.ofSeconds(15), Duration.ofMillis(250))
+                Component.text("ЗАВАНТАЖЕННЯ РЕАЛЬНОСТІ", NamedTextColor.GRAY, TextDecoration.BOLD),
+                Component.text("Прийміть ресурс-пак Yunexal Backrooms...", NamedTextColor.DARK_GRAY),
+                Title.Times.times(Duration.ofMillis(200), Duration.ofSeconds(10), Duration.ofMillis(300))
         ));
-        player.sendMessage(Component.text("▸ ", NamedTextColor.DARK_GRAY)
-                .append(Component.text("Завантаження ресурс-паку Backrooms обов'язкове для переходу на Рівень 0.", NamedTextColor.YELLOW)));
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!player.isOnline() || !pendingJoinAtMs.containsKey(uid)) {
-                return;
-            }
-            sendMandatoryPack(player, cfg);
-        }, cfg.getRpSendDelayTicks());
+        Bukkit.getScheduler().runTaskLater(plugin, () -> dispatchPack(player), cfg.getRpSendDelayTicks());
     }
 
-    public void sendMandatoryPack(Player player, BackroomsConfig cfg) {
-        packDispatched.add(player.getUniqueId());
-        byte[] sha1 = cfg.getRpSha1Bytes();
-        if (sha1.length == 20) {
-            player.setResourcePack(cfg.getRpUuid(), cfg.getRpUrl(), sha1, cfg.getRpPrompt(), cfg.isRpRequired());
-        } else {
-            player.setResourcePack(cfg.getRpUuid(), cfg.getRpUrl(), cfg.getRpSha1Hex(), cfg.getRpPrompt(), cfg.isRpRequired());
-        }
-    }
-
-    @EventHandler
-    public void onResourcePackStatus(PlayerResourcePackStatusEvent event) {
-        Player player = event.getPlayer();
-        UUID uid = player.getUniqueId();
-        if (!pendingJoinAtMs.containsKey(uid) || !packDispatched.contains(uid)) {
+    private void dispatchPack(Player player) {
+        if (!player.isOnline() || !pendingJoinAtMs.containsKey(player.getUniqueId())) {
             return;
         }
         BackroomsConfig cfg = plugin.getBackroomsConfig();
-        if (!cfg.getRpUuid().equals(event.getID())) {
+        byte[] sha1 = cfg.getRpSha1Bytes();
+        if (sha1.length != 20) {
+            plugin.getLogger().severe("Invalid resource-pack SHA-1 configured! Failing open safety check aborted -> disconnecting.");
+            failGate(player, "Помилка конфігурації SHA-1 ресурс-паку на сервері.");
             return;
         }
 
-        PlayerResourcePackStatusEvent.Status status = event.getStatus();
-        switch (status) {
-            case ACCEPTED -> {
-                player.sendActionBar(Component.text("Завантаження ресурс-паку Backrooms...", NamedTextColor.YELLOW));
-            }
-            case DOWNLOADED -> {
-                player.sendActionBar(Component.text("Застосування текстур Level 0...", NamedTextColor.GOLD));
-            }
+        packDispatched.add(player.getUniqueId());
+        player.setResourcePack(
+                cfg.getRpUuid(),
+                cfg.getRpUrl(),
+                sha1,
+                cfg.getRpPrompt(),
+                cfg.isRpRequired()
+        );
+    }
+
+    @EventHandler
+    public void onPackStatus(PlayerResourcePackStatusEvent event) {
+        Player player = event.getPlayer();
+        UUID uid = player.getUniqueId();
+        BackroomsConfig cfg = plugin.getBackroomsConfig();
+
+        if (!event.getID().equals(cfg.getRpUuid())) {
+            return;
+        }
+        if (!pendingJoinAtMs.containsKey(uid)) {
+            return;
+        }
+
+        switch (event.getStatus()) {
+            case ACCEPTED -> player.sendActionBar(Component.text("Завантаження ресурс-паку Backrooms...", NamedTextColor.YELLOW));
+            case DOWNLOADED -> player.sendActionBar(Component.text("Застосування текстур Level 0...", NamedTextColor.GOLD));
             case SUCCESSFULLY_LOADED -> {
                 pendingJoinAtMs.remove(uid);
                 packDispatched.remove(uid);
@@ -280,8 +284,13 @@ public final class LimboManager implements Listener {
         player.setFoodLevel(20);
         player.setSaturation(20.0f);
 
-        Location spawnLoc = plugin.getLevel0Generator().findSafeSpawn(level0);
-        player.teleport(spawnLoc);
+        Location targetLoc = plugin.getPlayerData().loadAndRestore(player, level0);
+        boolean firstEntry = (targetLoc == null);
+        if (firstEntry) {
+            targetLoc = plugin.getLevel0Generator().findRandomFarSpawn(
+                    level0, Bukkit.getOnlinePlayers(), plugin.getBackroomsConfig().getSpawnRadius());
+        }
+        player.teleport(targetLoc);
 
         for (Player other : Bukkit.getOnlinePlayers()) {
             if (!other.equals(player) && !pendingJoinAtMs.containsKey(other.getUniqueId())) {
@@ -291,20 +300,23 @@ public final class LimboManager implements Listener {
         }
 
         if (playNoclip) {
-            player.playSound(spawnLoc, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.85f, 1.0f);
+            player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.85f, 1.0f);
         }
 
         player.showTitle(Title.title(
                 Component.text("РІВЕНЬ 0", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                Component.text("«Лобі» // 600 млн кв. миль моно-жовтих стін", NamedTextColor.GRAY),
+                Component.text("«Лобі» // Безкраї жовті коридори", NamedTextColor.GRAY),
                 Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(4), Duration.ofMillis(800))
         ));
-        player.sendMessage(Component.text("▸ ", NamedTextColor.YELLOW)
-                .append(Component.text("Ви провалилися крізь реальність на ", NamedTextColor.GRAY))
-                .append(Component.text("Рівень 0 «Лобі»", NamedTextColor.GOLD))
-                .append(Component.text(". Повернутись у хаб: ", NamedTextColor.GRAY))
-                .append(Component.text("/br hub", NamedTextColor.AQUA)));
-        plugin.getListeners().updateScoreboard(player);
+        if (firstEntry) {
+            player.sendMessage(Component.text("▸ ", NamedTextColor.YELLOW)
+                    .append(Component.text("Ви провалилися крізь реальність на ", NamedTextColor.GRAY))
+                    .append(Component.text("Рівень 0 «Лобі»", NamedTextColor.GOLD))
+                    .append(Component.text(". Крафти: ", NamedTextColor.GRAY))
+                    .append(Component.text("/br craft", NamedTextColor.YELLOW))
+                    .append(Component.text(" | Хаб: ", NamedTextColor.GRAY))
+                    .append(Component.text("/br hub", NamedTextColor.AQUA)));
+        }
     }
 
     private void failGate(Player player, String reason) {
@@ -316,6 +328,7 @@ public final class LimboManager implements Listener {
     }
 
     public void sendToHubOrKick(Player player, String kickReason) {
+        plugin.getPlayerData().savePlayer(player);
         String target = plugin.getBackroomsConfig().getFallbackServer();
         try {
             ByteArrayOutputStream b = new ByteArrayOutputStream();
@@ -374,10 +387,13 @@ public final class LimboManager implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onQuit(PlayerQuitEvent event) {
         event.quitMessage(null);
-        UUID uid = event.getPlayer().getUniqueId();
+        Player player = event.getPlayer();
+        plugin.getPlayerData().savePlayer(player);
+        plugin.getListeners().clearPlayerState(player);
+        UUID uid = player.getUniqueId();
         pendingJoinAtMs.remove(uid);
         packDispatched.remove(uid);
         verifiedPlayers.remove(uid);

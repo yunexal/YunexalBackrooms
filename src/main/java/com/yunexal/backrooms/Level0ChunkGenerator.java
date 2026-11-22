@@ -3,27 +3,32 @@ package com.yunexal.backrooms;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
 import org.bukkit.generator.BiomeProvider;
+import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.generator.WorldInfo;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Completely custom procedural Backrooms Level 0 ("The Lobby") chunk generator.
+ * Procedural Backrooms Level 0 ("The Lobby") chunk generator.
  *
  * <p>Architecture guarantees:
  * <ul>
  *     <li>Each 4x4 block cell maps seamlessly inside 16x16 chunks (4x4 cells/chunk) with zero border seams.</li>
  *     <li>Each 8x8 cell macro-region (32x32 blocks = 2x2 chunks) runs a randomized DFS spanning tree plus
- *         deterministic East/South inter-region doorways, guaranteeing 100% reachability everywhere.</li>
- *     <li>Macro zones vary naturally between classic twisting yellow corridors, open pillared halls,
- *         tight labyrinth sectors, and flickering blackout areas.</li>
+ *         deterministic East/South inter-region doorways, guaranteeing reachability everywhere.</li>
+ *     <li>Includes classic yellow corridors, pillared halls, tight labyrinths, blackout sectors,
+ *         warm Manila sanctuary rooms, crimson Red Rooms, and rare soft-carpet noclip anomalies.</li>
  * </ul>
  */
 public final class Level0ChunkGenerator extends ChunkGenerator {
@@ -35,7 +40,9 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         CLASSIC_MAZE,
         PILLAR_HALL,
         NARROW_MAZE,
-        BLACKOUT_ZONE
+        BLACKOUT_ZONE,
+        MANILA_ROOM,
+        RED_ROOM
     }
 
     private enum LightState {
@@ -47,7 +54,6 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
 
     private static final class RegionPlan {
         final ZoneType zoneType;
-        // walls[lx][lz]: true = solid wall along West (lx=0) or North (lz=0) boundary of cell
         final boolean[][] westWall = new boolean[REGION_CELLS][REGION_CELLS];
         final boolean[][] northWall = new boolean[REGION_CELLS][REGION_CELLS];
 
@@ -56,7 +62,7 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         }
     }
 
-    private final BackroomsConfig config;
+    private final YunexalBackroomsPlugin plugin;
     private final BiomeProvider biomeProvider = new Level0BiomeProvider();
     private final Map<Long, RegionPlan> regionCache = Collections.synchronizedMap(
             new LinkedHashMap<>(256, 0.75f, true) {
@@ -67,17 +73,32 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             }
     );
 
-    public Level0ChunkGenerator(BackroomsConfig config) {
-        this.config = config;
+    public Level0ChunkGenerator(YunexalBackroomsPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    private BackroomsConfig cfg() {
+        return plugin.getBackroomsConfig();
+    }
+
+    public void clearCache() {
+        regionCache.clear();
     }
 
     private long effectiveSeed(WorldInfo worldInfo) {
-        return config.getLevel0Seed() != 0L ? config.getLevel0Seed() : worldInfo.getSeed();
+        long configured = cfg().getLevel0Seed();
+        return configured != 0L ? configured : worldInfo.getSeed();
+    }
+
+    private long effectiveSeed(World world) {
+        long configured = cfg().getLevel0Seed();
+        return configured != 0L ? configured : world.getSeed();
     }
 
     @Override
     public void generateNoise(@NotNull WorldInfo worldInfo, @NotNull Random unused,
                               int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
+        BackroomsConfig config = cfg();
         long seed = effectiveSeed(worldInfo);
         int floorY = config.getFloorY();
         int wallHeight = config.getWallHeight();
@@ -101,26 +122,39 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
                 chunkData.setBlock(lx, ceilingY + 1, lz, Material.BEDROCK);
                 chunkData.setBlock(lx, ceilingY + 2, lz, Material.BEDROCK);
 
-                // 2. Damp commercial office carpet floor.
-                chunkData.setBlock(lx, floorY, lz, Material.BROWN_WOOL);
-
                 ZoneType zone = getZoneType(seed, cx, cz);
                 boolean solidWall = isWallBlock(seed, cx, cz, inCellX, inCellZ, zone);
 
+                // 2. Floor material (damp wool carpet, crimson carpet in Red Rooms, or rare soft carpet noclip spot).
+                Material floorMat;
+                if (zone == ZoneType.RED_ROOM) {
+                    floorMat = Material.RED_WOOL;
+                } else if (!solidWall && isNaturalNoclipSpot(seed, config, cx, cz, wx, wz, zone)) {
+                    floorMat = Material.GRAY_WOOL;
+                } else {
+                    floorMat = Material.BROWN_WOOL;
+                }
+                chunkData.setBlock(lx, floorY, lz, floorMat);
+
                 if (solidWall) {
                     boolean corner = (inCellX == 0 && inCellZ == 0);
-                    buildWallColumn(chunkData, lx, lz, floorY, ceilingY, seed, wx, wz, corner);
+                    buildWallColumn(chunkData, config, lx, lz, floorY, ceilingY, seed, wx, wz, cx, cz, inCellX, inCellZ, corner, zone);
                 }
 
                 // 3. Drop ceiling & ceiling fixtures.
                 if (inCellX == 2 && inCellZ == 2 && !solidWall) {
-                    LightState light = getLightState(seed, cx, cz, zone);
-                    Material ceilingMat = switch (light) {
-                        case WORKING -> Material.OCHRE_FROGLIGHT;
-                        case FLICKERING -> Material.SEA_LANTERN;
-                        case DEAD -> Material.POLISHED_ANDESITE;
-                        case NONE -> Material.CALCITE;
-                    };
+                    LightState light = getLightState(seed, config, cx, cz, zone);
+                    Material ceilingMat;
+                    if (zone == ZoneType.RED_ROOM) {
+                        ceilingMat = (light == LightState.NONE) ? Material.CALCITE : Material.SHROOMLIGHT;
+                    } else {
+                        ceilingMat = switch (light) {
+                            case WORKING -> Material.OCHRE_FROGLIGHT;
+                            case FLICKERING -> Material.SEA_LANTERN;
+                            case DEAD -> Material.POLISHED_ANDESITE;
+                            case NONE -> Material.CALCITE;
+                        };
+                    }
                     chunkData.setBlock(lx, ceilingY, lz, ceilingMat);
                 } else {
                     chunkData.setBlock(lx, ceilingY, lz, Material.CALCITE);
@@ -129,8 +163,24 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         }
     }
 
-    private void buildWallColumn(ChunkData chunkData, int lx, int lz, int floorY, int ceilingY,
-                                 long seed, int wx, int wz, boolean corner) {
+    private void buildWallColumn(ChunkData chunkData, BackroomsConfig config,
+                                 int lx, int lz, int floorY, int ceilingY,
+                                 long seed, int wx, int wz, int cx, int cz,
+                                 int inCellX, int inCellZ, boolean corner, ZoneType zone) {
+        if (zone == ZoneType.RED_ROOM) {
+            for (int y = floorY + 1; y < ceilingY; y++) {
+                chunkData.setBlock(lx, y, lz, Material.RED_TERRACOTTA);
+            }
+            return;
+        }
+
+        if (zone == ZoneType.MANILA_ROOM && isManilaPerimeterCell(cx, cz, inCellX, inCellZ)) {
+            for (int y = floorY + 1; y < ceilingY; y++) {
+                chunkData.setBlock(lx, y, lz, Material.WHITE_TERRACOTTA);
+            }
+            return;
+        }
+
         long colHash = mix64(seed ^ 0x517CC1B727220A95L, wx, wz);
         double dampRoll = toUnitDouble(colHash);
 
@@ -155,23 +205,70 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         }
     }
 
+    private boolean isManilaPerimeterCell(int cx, int cz, int inCellX, int inCellZ) {
+        int rlx = Math.floorMod(cx, REGION_CELLS);
+        int rlz = Math.floorMod(cz, REGION_CELLS);
+        if (rlx >= 2 && rlx <= 4 && rlz >= 2 && rlz <= 4) {
+            return true;
+        }
+        if (rlx == 5 && inCellX == 0 && rlz >= 2 && rlz <= 5) {
+            return true;
+        }
+        return rlz == 5 && inCellZ == 0 && rlx >= 2 && rlx <= 5;
+    }
+
+    public boolean isNaturalNoclipSpot(World world, int wx, int wz) {
+        BackroomsConfig config = cfg();
+        long seed = effectiveSeed(world);
+        int cx = Math.floorDiv(wx, CELL_SIZE);
+        int cz = Math.floorDiv(wz, CELL_SIZE);
+        int inCellX = Math.floorMod(wx, CELL_SIZE);
+        int inCellZ = Math.floorMod(wz, CELL_SIZE);
+        ZoneType zone = getZoneType(seed, cx, cz);
+        if (isWallBlock(seed, cx, cz, inCellX, inCellZ, zone)) {
+            return false;
+        }
+        return isNaturalNoclipSpot(seed, config, cx, cz, wx, wz, zone);
+    }
+
+    private boolean isNaturalNoclipSpot(long seed, BackroomsConfig config,
+                                        int cx, int cz, int wx, int wz, ZoneType zone) {
+        if (zone == ZoneType.MANILA_ROOM || zone == ZoneType.RED_ROOM) {
+            return false;
+        }
+        if (Math.abs(cx) <= 2 && Math.abs(cz) <= 2) {
+            return false;
+        }
+        // Only one small patch per cell center, keeping frequency strictly governed by config
+        if (Math.floorMod(wx, CELL_SIZE) != 2 || Math.floorMod(wz, CELL_SIZE) != 2) {
+            return false;
+        }
+        double roll = toUnitDouble(mix64(seed ^ 0x243F6A8885A308D3L, wx, wz));
+        return roll < config.getSoftCarpetChance();
+    }
+
     private boolean isWallBlock(long seed, int cx, int cz, int inCellX, int inCellZ, ZoneType zone) {
         if (inCellX > 0 && inCellZ > 0) {
             return false;
         }
+        int rlx = Math.floorMod(cx, REGION_CELLS);
+        int rlz = Math.floorMod(cz, REGION_CELLS);
+
         if (inCellX == 0 && inCellZ == 0) {
+            // Keep Manila Room 12x12 center clear of corner pillars
+            if (zone == ZoneType.MANILA_ROOM && rlx >= 3 && rlx <= 4 && rlz >= 3 && rlz <= 4) {
+                return false;
+            }
             if (zone == ZoneType.PILLAR_HALL) {
-                // Keep structural 1x1 columns across open halls, occasionally opening a wider bay
                 long h = mix64(seed ^ 0xA24BAED4963EE407L, cx, cz);
                 return toUnitDouble(h) > 0.16;
             }
-            // Around spawn corridor make corners clean if all 4 neighboring walls are open
             boolean w1 = hasWestWall(seed, cx, cz);
             boolean w2 = hasWestWall(seed, cx, cz - 1);
             boolean n1 = hasNorthWall(seed, cx, cz);
             boolean n2 = hasNorthWall(seed, cx - 1, cz);
             if (!w1 && !w2 && !n1 && !n2) {
-                return (cx != 0 && cz != 0) && toUnitDouble(mix64(seed, cx, cz)) < 0.72;
+                return (cx != 0 || cz != 0) && toUnitDouble(mix64(seed, cx, cz)) < 0.72;
             }
             return true;
         }
@@ -197,6 +294,10 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         return getRegionPlan(seed, rx, rz).northWall[lx][lz];
     }
 
+    public ZoneType getZoneAtRegion(long seed, int rx, int rz) {
+        return getRegionPlan(seed, rx, rz).zoneType;
+    }
+
     private ZoneType getZoneType(long seed, int cx, int cz) {
         int rx = Math.floorDiv(cx, REGION_CELLS);
         int rz = Math.floorDiv(cz, REGION_CELLS);
@@ -215,7 +316,8 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
     }
 
     private RegionPlan buildRegionPlan(long seed, int rx, int rz) {
-        ZoneType zone = pickZoneType(seed, rx, rz);
+        BackroomsConfig config = cfg();
+        ZoneType zone = pickZoneType(seed, config, rx, rz);
         RegionPlan plan = new RegionPlan(zone);
         for (int x = 0; x < REGION_CELLS; x++) {
             for (int z = 0; z < REGION_CELLS; z++) {
@@ -224,7 +326,6 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             }
         }
 
-        // Randomized DFS spanning tree inside the 8x8 macro-region for zero diagonal bias and 100% connectivity.
         Random rng = new Random(mix64(seed ^ 0x3C6EF372FE94F82AL, rx, rz));
         boolean[][] visited = new boolean[REGION_CELLS][REGION_CELLS];
         ArrayDeque<int[]> stack = new ArrayDeque<>();
@@ -242,7 +343,6 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             int cx = cur[0];
             int cz = cur[1];
 
-            // Fisher-Yates shuffle on 4 directions
             for (int i = 3; i > 0; i--) {
                 int j = rng.nextInt(i + 1);
                 int tmp = order[i];
@@ -267,11 +367,12 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             }
         }
 
-        // Braiding & architectural shaping by macro-zone
         double braidChance = switch (zone) {
             case PILLAR_HALL -> 0.84;
             case NARROW_MAZE -> config.getExtraBraidingChance() * 0.45;
             case BLACKOUT_ZONE -> config.getExtraBraidingChance() * 1.10;
+            case RED_ROOM -> config.getExtraBraidingChance() * 0.90;
+            case MANILA_ROOM -> 0.62;
             case CLASSIC_MAZE -> config.getExtraBraidingChance();
         };
 
@@ -290,8 +391,8 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             }
         }
 
-        // Carve occasional 2x2 alcove rooms in Classic / Blackout zones
-        if (zone == ZoneType.CLASSIC_MAZE || zone == ZoneType.BLACKOUT_ZONE) {
+        // Carve occasional 2x2 alcove rooms in Classic / Blackout / Red zones
+        if (zone == ZoneType.CLASSIC_MAZE || zone == ZoneType.BLACKOUT_ZONE || zone == ZoneType.RED_ROOM) {
             int roomCount = 1 + rng.nextInt(3);
             for (int r = 0; r < roomCount; r++) {
                 int ax = 1 + rng.nextInt(REGION_CELLS - 2);
@@ -303,7 +404,32 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             }
         }
 
-        // Keep spawn region (0, 0) cells (0..1, 0..1) open & inviting
+        // Carve enclosed 12x12 Manila Room (cells 2..4 x 2..4) with 4 cardinal doorway entrances
+        if (zone == ZoneType.MANILA_ROOM) {
+            for (int x = 3; x <= 4; x++) {
+                for (int z = 2; z <= 4; z++) {
+                    plan.westWall[x][z] = false;
+                }
+            }
+            for (int x = 2; x <= 4; x++) {
+                for (int z = 3; z <= 4; z++) {
+                    plan.northWall[x][z] = false;
+                }
+            }
+            for (int z = 2; z <= 4; z++) {
+                plan.westWall[2][z] = true;
+                plan.westWall[5][z] = true;
+            }
+            for (int x = 2; x <= 4; x++) {
+                plan.northWall[x][2] = true;
+                plan.northWall[x][5] = true;
+            }
+            plan.westWall[2][3] = false;
+            plan.westWall[5][3] = false;
+            plan.northWall[3][2] = false;
+            plan.northWall[3][5] = false;
+        }
+
         if (rx == 0 && rz == 0) {
             plan.westWall[1][0] = false;
             plan.westWall[1][1] = false;
@@ -311,7 +437,6 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             plan.northWall[1][1] = false;
         }
 
-        // Deterministic inter-region border doorways: every region connects to West (rx-1, rz) and North (rx, rz-1).
         boolean[] westOpen = borderOpenings(seed ^ 0x1B873593CC9E2D51L, rx - 1, rz);
         for (int z = 0; z < REGION_CELLS; z++) {
             plan.westWall[0][z] = !westOpen[z];
@@ -339,36 +464,51 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
     private boolean[] borderOpenings(long saltSeed, int fromRx, int fromRz) {
         boolean[] open = new boolean[REGION_CELLS];
         Random r = new Random(mix64(saltSeed, fromRx, fromRz));
-        int count = 2 + r.nextInt(2); // 2 or 3 doorways along each 8-cell edge
+        int count = 2 + r.nextInt(2);
         for (int i = 0; i < count; i++) {
             open[r.nextInt(REGION_CELLS)] = true;
         }
         return open;
     }
 
-    private ZoneType pickZoneType(long seed, int rx, int rz) {
+    private ZoneType pickZoneType(long seed, BackroomsConfig config, int rx, int rz) {
         if (rx == 0 && rz == 0) {
             return ZoneType.CLASSIC_MAZE;
         }
         double roll = toUnitDouble(mix64(seed ^ 0xD6E8FEB86659FD93L, rx, rz));
+        double pManila = config.getManilaRoomChance();
+        double pRed = config.getRedRoomChance();
         double pBlackout = config.getBlackoutZoneChance();
         double pPillar = config.getPillarHallChance();
         double pNarrow = config.getNarrowMazeChance();
 
-        if (roll < pBlackout) {
+        double acc = pManila;
+        if (roll < acc) {
+            return ZoneType.MANILA_ROOM;
+        }
+        acc += pRed;
+        if (roll < acc) {
+            return ZoneType.RED_ROOM;
+        }
+        acc += pBlackout;
+        if (roll < acc) {
             return ZoneType.BLACKOUT_ZONE;
         }
-        if (roll < pBlackout + pPillar) {
+        acc += pPillar;
+        if (roll < acc) {
             return ZoneType.PILLAR_HALL;
         }
-        if (roll < pBlackout + pPillar + pNarrow) {
+        acc += pNarrow;
+        if (roll < acc) {
             return ZoneType.NARROW_MAZE;
         }
         return ZoneType.CLASSIC_MAZE;
     }
 
-    private LightState getLightState(long seed, int cx, int cz, ZoneType zone) {
-        // Keep spawn area brightly and steadily illuminated on first noclip entry.
+    private LightState getLightState(long seed, BackroomsConfig config, int cx, int cz, ZoneType zone) {
+        if (zone == ZoneType.MANILA_ROOM) {
+            return LightState.WORKING;
+        }
         if (Math.abs(cx) <= 2 && Math.abs(cz) <= 2) {
             if ((cx & 1) == 0 || (cz & 1) == 0) {
                 return LightState.WORKING;
@@ -377,7 +517,7 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         }
 
         double roll = toUnitDouble(mix64(seed ^ 0x94D049BB133111EBL, cx, cz));
-        if (zone == ZoneType.BLACKOUT_ZONE) {
+        if (zone == ZoneType.BLACKOUT_ZONE || zone == ZoneType.RED_ROOM) {
             if (roll < 0.08) {
                 return LightState.WORKING;
             }
@@ -400,7 +540,6 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             return LightState.WORKING;
         }
 
-        // Classic / Narrow corridors
         if (roll < config.getFlickerLightChance()) {
             return LightState.FLICKERING;
         }
@@ -414,31 +553,73 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
     }
 
     public Location findSafeSpawn(World world) {
-        long seed = world.getSeed();
-        if (config.getLevel0Seed() != 0L) {
-            seed = config.getLevel0Seed();
-        }
-        // Cell (0,0)..(1,1) center (lx=2, lz=2) is always open floor at y=floorY+1
-        double x = 0 * CELL_SIZE + 2.5;
-        double z = 0 * CELL_SIZE + 2.5;
-        int floorY = config.getFloorY();
-        // Verify cell center isn't blocked even if config changed dynamically
+        long seed = effectiveSeed(world);
+        int floorY = cfg().getFloorY();
         for (int r = 0; r <= 4; r++) {
             for (int cx = -r; cx <= r; cx++) {
                 for (int cz = -r; cz <= r; cz++) {
                     if (!isWallBlock(seed, cx, cz, 2, 2, getZoneType(seed, cx, cz))) {
-                        x = cx * CELL_SIZE + 2.5;
-                        z = cz * CELL_SIZE + 2.5;
-                        return new Location(world, x, floorY + 1.0, z, -45f, 0f);
+                        return new Location(world, cx * CELL_SIZE + 2.5, floorY + 1.0, cz * CELL_SIZE + 2.5, -45f, 0f);
                     }
                 }
             }
         }
-        return new Location(world, x, floorY + 1.0, z, -45f, 0f);
+        return new Location(world, 2.5, floorY + 1.0, 2.5, -45f, 0f);
+    }
+
+    /**
+     * Picks an isolated random corridor spawn across the huge Level 0 map, distanced from existing explorers.
+     */
+    public Location findRandomFarSpawn(World world, Collection<? extends Player> onlinePlayers, int maxRadius) {
+        BackroomsConfig config = cfg();
+        long seed = effectiveSeed(world);
+        int floorY = config.getFloorY();
+        int cellRadius = Math.max(16, maxRadius / CELL_SIZE);
+        ThreadLocalRandom rng = ThreadLocalRandom.current();
+
+        Location bestFallback = null;
+        double bestMinDistSq = -1.0;
+
+        for (int attempt = 0; attempt < 64; attempt++) {
+            int cx = rng.nextInt(-cellRadius, cellRadius + 1);
+            int cz = rng.nextInt(-cellRadius, cellRadius + 1);
+            ZoneType zone = getZoneType(seed, cx, cz);
+            if (zone == ZoneType.RED_ROOM || zone == ZoneType.BLACKOUT_ZONE || zone == ZoneType.MANILA_ROOM) {
+                continue;
+            }
+            if (isWallBlock(seed, cx, cz, 2, 2, zone)) {
+                continue;
+            }
+            int wx = cx * CELL_SIZE + 2;
+            int wz = cz * CELL_SIZE + 2;
+            if (isNaturalNoclipSpot(seed, config, cx, cz, wx, wz, zone)) {
+                continue;
+            }
+
+            double minDistSq = Double.MAX_VALUE;
+            for (Player other : onlinePlayers) {
+                if (other.getWorld().equals(world)) {
+                    double dx = other.getLocation().getX() - (wx + 0.5);
+                    double dz = other.getLocation().getZ() - (wz + 0.5);
+                    minDistSq = Math.min(minDistSq, dx * dx + dz * dz);
+                }
+            }
+
+            float yaw = rng.nextInt(4) * 90f;
+            Location candidate = new Location(world, wx + 0.5, floorY + 1.0, wz + 0.5, yaw, 0f);
+            if (minDistSq >= 300.0 * 300.0) {
+                return candidate;
+            }
+            if (minDistSq > bestMinDistSq) {
+                bestMinDistSq = minDistSq;
+                bestFallback = candidate;
+            }
+        }
+        return bestFallback != null ? bestFallback : findSafeSpawn(world);
     }
 
     public ZoneType getZoneAtBlock(World world, int blockX, int blockZ) {
-        long seed = config.getLevel0Seed() != 0L ? config.getLevel0Seed() : world.getSeed();
+        long seed = effectiveSeed(world);
         int cx = Math.floorDiv(blockX, CELL_SIZE);
         int cz = Math.floorDiv(blockZ, CELL_SIZE);
         return getZoneType(seed, cx, cz);
@@ -453,6 +634,11 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
 
     private static double toUnitDouble(long hash) {
         return ((hash >>> 11) * 0x1.0p-53);
+    }
+
+    @Override
+    public @NotNull List<BlockPopulator> getDefaultPopulators(@NotNull World world) {
+        return List.of(new Level0Populator(plugin));
     }
 
     @Override
