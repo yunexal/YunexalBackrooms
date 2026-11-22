@@ -3,14 +3,18 @@ package com.yunexal.backrooms;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BookMeta;
+import org.bukkit.inventory.meta.CompassMeta;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.potion.PotionType;
 
 import java.util.List;
 
@@ -31,6 +35,8 @@ public final class BackroomsItems {
     public static final String ID_CROWBAR = "crowbar";
     public static final String ID_FLASHLIGHT = "flashlight";
     public static final String ID_MARKER = "marker";
+    public static final String ID_ALMOND_WATER = "almond_water";
+    public static final String ID_BROKEN_COMPASS = "broken_compass";
 
     private final NamespacedKey itemKey;
 
@@ -157,6 +163,45 @@ public final class BackroomsItems {
                         Component.text("ПКМ по килиму — ставить орієнтир,", NamedTextColor.GRAY),
                         Component.text("щоб не блукати колами.", NamedTextColor.DARK_GRAY)
                 ), false);
+    }
+
+    public ItemStack almondWater(int amount) {
+        ItemStack potion = new ItemStack(Material.POTION, amount);
+        if (potion.getItemMeta() instanceof PotionMeta meta) {
+            meta.setBasePotionType(PotionType.WATER);
+            meta.setColor(Color.fromRGB(0xE6D3A3));
+            meta.displayName(Component.text("Мигдальна вода", NamedTextColor.GOLD)
+                    .decoration(TextDecoration.ITALIC, false));
+            meta.lore(List.of(
+                    Component.text("Солодкувата на смак вода зі слабким ароматом мигдалю.", NamedTextColor.GRAY)
+                            .decoration(TextDecoration.ITALIC, false),
+                    Component.text("Повністю відновлює голод, насиченість і знімає втому.", NamedTextColor.GREEN)
+                            .decoration(TextDecoration.ITALIC, false)
+            ));
+            meta.getPersistentDataContainer().set(itemKey, PersistentDataType.STRING, ID_ALMOND_WATER);
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+            potion.setItemMeta(meta);
+        }
+        return potion;
+    }
+
+    public ItemStack brokenCompass() {
+        ItemStack compass = new ItemStack(Material.COMPASS, 1);
+        if (compass.getItemMeta() instanceof CompassMeta meta) {
+            meta.setLodestoneTracked(false);
+            meta.displayName(Component.text("Аномальний компас", NamedTextColor.AQUA)
+                    .decoration(TextDecoration.ITALIC, false));
+            meta.lore(List.of(
+                    Component.text("Стрілка хаотично обертається...", NamedTextColor.GRAY)
+                            .decoration(TextDecoration.ITALIC, false),
+                    Component.text("Магнітного поля на Рівні 0 немає.", NamedTextColor.DARK_GRAY)
+                            .decoration(TextDecoration.ITALIC, false)
+            ));
+            meta.getPersistentDataContainer().set(itemKey, PersistentDataType.STRING, ID_BROKEN_COMPASS);
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+            compass.setItemMeta(meta);
+        }
+        return compass;
     }
 
     public ItemStack createMegManualBook() {

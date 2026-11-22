@@ -187,13 +187,16 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         boolean stainedBase = dampRoll < config.getDampPillarChance() * (corner ? 1.35 : 0.45);
         boolean fullMoldPillar = corner && dampRoll < (config.getDampPillarChance() * 0.28);
         boolean hvacVentTop = !corner && !fullMoldPillar && dampRoll > (1.0 - config.getVentChance());
+        boolean deadOutlet = !corner && !fullMoldPillar && !stainedBase && !hvacVentTop
+                && toUnitDouble(mix64(seed ^ 0x4B72E682A51F31D9L, wx, wz)) < config.getOutletChance();
 
         for (int y = floorY + 1; y < ceilingY; y++) {
             Material mat;
             if (fullMoldPillar) {
                 mat = Material.BROWN_TERRACOTTA;
             } else if (y == floorY + 1) {
-                mat = stainedBase ? Material.BROWN_TERRACOTTA : Material.ORANGE_TERRACOTTA;
+                mat = stainedBase ? Material.BROWN_TERRACOTTA
+                        : (deadOutlet ? Material.CYAN_TERRACOTTA : Material.ORANGE_TERRACOTTA);
             } else if (y == ceilingY - 1 && hvacVentTop) {
                 mat = Material.IRON_BLOCK;
             } else if (y == floorY + 2 && stainedBase && ((colHash >>> 12) & 3) == 0) {

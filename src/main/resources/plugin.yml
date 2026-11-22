@@ -3,6 +3,7 @@ version: ${project.version}
 main: com.yunexal.backrooms.YunexalBackroomsPlugin
 api-version: '1.21'
 load: STARTUP
+softdepend: [TAB, voicechat]
 description: Procedural Backrooms Level 0 world generator with mandatory Limbo resource pack verification
 author: Yunexal Team
 

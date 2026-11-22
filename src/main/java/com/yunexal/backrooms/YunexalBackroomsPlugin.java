@@ -19,6 +19,8 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
     private VoidChunkGenerator voidGenerator;
     private LimboManager limboManager;
     private BackroomsListeners listeners;
+    private HallucinationManager hallucinations;
+    private BackroomsVoicePlugin voicePlugin;
 
     @Override
     public void onLoad() {
@@ -42,6 +44,7 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         this.craftingManager.registerRecipes();
         this.limboManager = new LimboManager(this);
         this.listeners = new BackroomsListeners(this);
+        this.hallucinations = new HallucinationManager(this);
 
         getServer().getPluginManager().registerEvents(craftingManager, this);
         getServer().getPluginManager().registerEvents(limboManager, this);
@@ -58,6 +61,8 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
             configureLevel0WorldRules();
             this.limboManager.init();
             this.listeners.start();
+            this.hallucinations.start();
+            registerVoiceChatHook();
             getLogger().info("YunexalBackrooms worlds ready: Level 0='"
                     + backroomsConfig.getLevel0WorldName() + "', Limbo='"
                     + backroomsConfig.getLimboWorldName() + "', Border="
@@ -73,6 +78,12 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         if (playerData != null) {
             playerData.saveAllOnline();
         }
+        if (hallucinations != null) {
+            hallucinations.shutdown();
+        }
+        if (voicePlugin != null) {
+            voicePlugin.shutdown();
+        }
         if (listeners != null) {
             listeners.shutdown();
         }
@@ -80,6 +91,21 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
             limboManager.shutdown();
         }
         getServer().getMessenger().unregisterOutgoingPluginChannel(this, "BungeeCord");
+    }
+
+    private void registerVoiceChatHook() {
+        try {
+            if (getServer().getPluginManager().isPluginEnabled("voicechat")) {
+                var service = getServer().getServicesManager().load(de.maxhenkel.voicechat.api.BukkitVoicechatService.class);
+                if (service != null) {
+                    this.voicePlugin = new BackroomsVoicePlugin(this);
+                    service.registerPlugin(this.voicePlugin);
+                    getLogger().info("Registered Simple Voice Chat interference hook for Level 0.");
+                }
+            }
+        } catch (NoClassDefFoundError | Exception e) {
+            getLogger().warning("Simple Voice Chat hook unavailable: " + e.getMessage());
+        }
     }
 
     public void reloadBackroomsConfig() {
@@ -160,6 +186,10 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
 
     public BackroomsListeners getListeners() {
         return listeners;
+    }
+
+    public HallucinationManager getHallucinations() {
+        return hallucinations;
     }
 
     public @Nullable World getLevel0World() {

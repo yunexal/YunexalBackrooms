@@ -46,6 +46,7 @@ public final class BackroomsConfig {
     private final double flickerLightChance;
     private final double deadLightChance;
     private final double ventChance;
+    private final double outletChance;
     private final double dampPillarChance;
 
     private final boolean ambientEnabled;
@@ -92,6 +93,7 @@ public final class BackroomsConfig {
         this.flickerLightChance = clamp01(cfg.getDouble("level0.flicker-light-chance", 0.12));
         this.deadLightChance = clamp01(cfg.getDouble("level0.dead-light-chance", 0.10));
         this.ventChance = clamp01(cfg.getDouble("level0.vent-chance", 0.045));
+        this.outletChance = clamp01(cfg.getDouble("level0.outlet-chance", 0.018));
         this.dampPillarChance = clamp01(cfg.getDouble("level0.damp-pillar-chance", 0.18));
 
         this.ambientEnabled = cfg.getBoolean("ambient.enabled", true);
@@ -151,6 +153,7 @@ public final class BackroomsConfig {
     public double getFlickerLightChance() { return flickerLightChance; }
     public double getDeadLightChance() { return deadLightChance; }
     public double getVentChance() { return ventChance; }
+    public double getOutletChance() { return outletChance; }
     public double getDampPillarChance() { return dampPillarChance; }
 
     public boolean isAmbientEnabled() { return ambientEnabled; }

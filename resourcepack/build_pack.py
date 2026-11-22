@@ -278,6 +278,30 @@ def generate_textures():
     red_lamp[3:29, 3:29, 2] *= 0.22
     save_png(red_lamp, "shroomlight.png")
 
+    # 17. Dead North American Duplex Wall Outlet on Baseboard Wallpaper (cyan_terracotta.png)
+    outlet = make_wallpaper_base(seed=1414, dark_shift=3)
+    rng_o = np.random.default_rng(1415)
+    # Matching skirting molding at bottom so it aligns flush with orange_terracotta.png
+    outlet[27, :] = [52, 39, 25]
+    outlet[28, :] = [88, 67, 43]
+    outlet[29:31, :] = [74, 56, 36]
+    outlet[31, :] = [48, 36, 23]
+    for y in range(27, 32):
+        outlet[y] += rng_o.normal(0, 2.5, (32, 1))
+    # Aged yellowed-ivory plastic wall plate centered above skirting (y=12..24, x=12..19)
+    outlet[12:24, 12:20] = [222, 214, 184]
+    outlet[12, 12:20] = [145, 138, 114]
+    outlet[23, 12:20] = [132, 126, 104]
+    outlet[12:24, 12] = [150, 144, 120]
+    outlet[12:24, 19] = [130, 124, 102]
+    # Center brass mounting screw + twin socket faces
+    outlet[17:19, 15:17] = [156, 142, 92]
+    for sy in (14, 20):
+        outlet[sy:sy + 2, 14] = [32, 30, 28]
+        outlet[sy:sy + 2, 17] = [32, 30, 28]
+        outlet[sy + 2, 15:17] = [44, 42, 38]
+    save_png(outlet, "cyan_terracotta.png")
+
 
 def _next_pow2(n):
     p = 1
@@ -582,6 +606,65 @@ def generate_audio():
     pulse_lr = fade_edges(pulse_lr, sr, fade_in_s=0.65, fade_out_s=0.80, equal_power=True)
     synth_ogg(pulse_lr, os.path.join(SND_DIR, "red_room_pulse.ogg"), sr, drive=1.12, target_peak=0.28)
 
+    # 9. wall_knock.ogg (1.3s 48kHz muffled hollow knocks inside gypsum wall cavity for Manila blackout)
+    dur_k = 1.3
+    nk = int(sr * dur_k)
+    tk = np.linspace(0.0, dur_k, nk, endpoint=False)
+    knocks_lr = np.zeros((nk, 2), dtype=np.float64)
+    for ts, f0, pan in ((0.06, 94.0, 0.40), (0.31, 88.0, 0.44), (0.59, 98.0, 0.38)):
+        idx = int(ts * sr)
+        klen = min(int(0.22 * sr), nk - idx)
+        if klen <= 0:
+            continue
+        t_loc = np.arange(klen, dtype=np.float64) / sr
+        f_k = f0 * np.exp(-16.0 * t_loc) + 46.0
+        ph_k = 2.0 * np.pi * np.cumsum(f_k) / sr
+        k_body = (0.75 * np.sin(ph_k) * np.exp(-14.0 * t_loc)
+                  + 0.32 * np.sin(2.0 * np.pi * (f0 * 1.9) * t_loc) * np.exp(-26.0 * t_loc))
+        k_tap = fft_band(rng.normal(0.0, 1.0, klen), sr, low_hz=90.0, high_hz=680.0, order=2.0) * np.exp(-38.0 * t_loc)
+        sig_k = (k_body + k_tap * 0.45) * (1.0 - np.exp(-t_loc / 0.0025))
+        knocks_lr[idx:idx + klen, 0] += sig_k * (1.0 - pan)
+        knocks_lr[idx:idx + klen, 1] += sig_k * pan
+    knocks_lr = fft_band(knocks_lr, sr, low_hz=35.0, high_hz=620.0, order=2.0)
+    knocks_lr = corridor_reverb(knocks_lr, sr, rt60=0.80, wet=0.45, bright_hz=760.0, seed=108)
+    knocks_lr = fade_edges(knocks_lr, sr, fade_in_s=0.004, fade_out_s=0.25)
+    synth_ogg(knocks_lr, os.path.join(SND_DIR, "wall_knock.ogg"), sr, drive=1.18, target_peak=0.46)
+
+    # 10. light_switch.ogg (0.35s 48kHz industrial electrical relay / breaker clack)
+    dur_s = 0.35
+    ns = int(sr * dur_s)
+    ts_arr = np.linspace(0.0, dur_s, ns, endpoint=False)
+    snap = fft_band(rng.normal(0.0, 1.0, (ns, 2)), sr, low_hz=700.0, high_hz=4400.0, order=2.0) * np.exp(-52.0 * ts_arr)[:, None]
+    relay_tone = ensure_stereo(
+        0.55 * np.sin(2.0 * np.pi * 210.0 * ts_arr) * np.exp(-28.0 * ts_arr)
+        + 0.35 * np.sin(2.0 * np.pi * 840.0 * ts_arr) * np.exp(-44.0 * ts_arr)
+    )
+    sw_lr = corridor_reverb(snap * 0.55 + relay_tone * 0.45, sr, rt60=0.42, wet=0.30, bright_hz=2600.0, seed=119)
+    sw_lr = fade_edges(sw_lr, sr, fade_in_s=0.002, fade_out_s=0.08)
+    synth_ogg(sw_lr, os.path.join(SND_DIR, "light_switch.ogg"), sr, drive=1.2, target_peak=0.44)
+
+    # 11. hallucination_whisper.ogg (1.5s 48kHz ghostly non-verbal corridor whisper behind player)
+    dur_wh = 1.5
+    nwh = int(sr * dur_wh)
+    twh = np.linspace(0.0, dur_wh, nwh, endpoint=False)
+    wh_env = (np.sin(np.pi * twh / dur_wh) ** 1.3) * (0.65 + 0.35 * np.sin(2.0 * np.pi * 2.7 * twh))
+    breath_noise = rng.normal(0.0, 1.0, (nwh, 2))
+    breath_f1 = fft_band(breath_noise, sr, low_hz=480.0, high_hz=1150.0, order=2.0)
+    breath_f2 = fft_band(breath_noise, sr, low_hz=1900.0, high_hz=3100.0, order=2.0)
+    wh_lr = (breath_f1 * 0.65 + breath_f2 * 0.35) * wh_env[:, None]
+    wh_lr = corridor_reverb(wh_lr, sr, rt60=0.95, wet=0.48, bright_hz=2100.0, seed=131)
+    wh_lr = fade_edges(wh_lr, sr, fade_in_s=0.18, fade_out_s=0.35)
+    synth_ogg(wh_lr, os.path.join(SND_DIR, "hallucination_whisper.ogg"), sr, drive=1.05, target_peak=0.32)
+
+    # 12. radio_static.ogg (0.42s 48kHz soft filtered radio squelch interference)
+    dur_st = 0.42
+    nst = int(sr * dur_st)
+    tst = np.linspace(0.0, dur_st, nst, endpoint=False)
+    st_env = (np.sin(np.pi * tst / dur_st) ** 0.7) * (0.7 + 0.3 * np.sin(2.0 * np.pi * 31.0 * tst))
+    st_lr = fft_band(rng.normal(0.0, 1.0, (nst, 2)), sr, low_hz=550.0, high_hz=3400.0, order=2.0) * st_env[:, None]
+    st_lr = fade_edges(st_lr, sr, fade_in_s=0.02, fade_out_s=0.08)
+    synth_ogg(st_lr, os.path.join(SND_DIR, "radio_static.ogg"), sr, drive=1.05, target_peak=0.22)
+
     write_json(os.path.join(PACK_DIR, "assets", "minecraft", "sounds.json"), {
         "backrooms.ambient.hum": {
             "sounds": [{"name": "backrooms/fluorescent_hum", "stream": False}]
@@ -606,6 +689,18 @@ def generate_audio():
         },
         "backrooms.ambient.red_pulse": {
             "sounds": [{"name": "backrooms/red_room_pulse", "stream": False}]
+        },
+        "backrooms.fx.wall_knock": {
+            "sounds": [{"name": "backrooms/wall_knock", "stream": False}]
+        },
+        "backrooms.fx.light_switch": {
+            "sounds": [{"name": "backrooms/light_switch", "stream": False}]
+        },
+        "backrooms.fx.whisper": {
+            "sounds": [{"name": "backrooms/hallucination_whisper", "stream": False}]
+        },
+        "backrooms.fx.radio_static": {
+            "sounds": [{"name": "backrooms/radio_static", "stream": False}]
         },
     })
 

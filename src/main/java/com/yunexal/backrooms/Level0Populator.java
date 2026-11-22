@@ -92,5 +92,11 @@ public final class Level0Populator extends BlockPopulator {
         if (rng.nextDouble() < 0.45) {
             inv.setItem(23, items.marker(2));
         }
+        if (rng.nextDouble() < 0.35) {
+            inv.setItem(24, items.almondWater(1));
+        }
+        if (rng.nextDouble() < 0.25) {
+            inv.setItem(25, items.brokenCompass());
+        }
     }
 }

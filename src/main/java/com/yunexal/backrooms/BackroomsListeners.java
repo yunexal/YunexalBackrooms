@@ -29,6 +29,7 @@ import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
@@ -408,7 +409,16 @@ public final class BackroomsListeners implements Listener {
             }
             if (BackroomsItems.ID_DAMP_WALLPAPER.equals(heldId)) {
                 event.setCancelled(true);
-                player.sendActionBar(Component.text("Волога рідина токсична! Просушіть її з сухими шпалерами.", NamedTextColor.RED));
+                applyCarpetLiquidToxicity(player, "Рідина зі шпалер токсична! Просушіть з сухими шпалерами.");
+                return;
+            }
+            if (held.getType() == Material.COMPASS || BackroomsItems.ID_BROKEN_COMPASS.equals(heldId)) {
+                player.sendActionBar(Component.text("Стрілка хаотично обертається — магнітного поля немає.", NamedTextColor.GRAY));
+            }
+            if (player.isSneaking() && action == Action.RIGHT_CLICK_BLOCK && clicked != null
+                    && clicked.getType() == Material.BROWN_WOOL) {
+                event.setCancelled(true);
+                applyCarpetLiquidToxicity(player, "Ви ковтнули каламутну рідину з вологого килиму!");
                 return;
             }
             if (BackroomsItems.ID_MARKER.equals(heldId) && action == Action.RIGHT_CLICK_BLOCK && clicked != null) {
@@ -417,6 +427,20 @@ public final class BackroomsListeners implements Listener {
                     return;
                 }
             }
+        }
+
+        // Dead 1980s North American electrical wall outlet (non-functional on Level 0)
+        if (clicked != null && clicked.getType() == Material.CYAN_TERRACOTTA
+                && (action == Action.LEFT_CLICK_BLOCK || action == Action.RIGHT_CLICK_BLOCK)) {
+            long now = System.currentTimeMillis();
+            UUID uid = player.getUniqueId();
+            if (now - lastInteractAtMs.getOrDefault(uid, 0L) >= 280L) {
+                lastInteractAtMs.put(uid, now);
+                player.playSound(clicked.getLocation().add(0.5, 0.5, 0.5), Sound.BLOCK_STONE_BUTTON_CLICK_OFF, SoundCategory.BLOCKS, 0.55f, 1.15f);
+                player.sendActionBar(Component.text("Розетка мертва. Струму на Рівні 0 немає.", NamedTextColor.GRAY));
+            }
+            event.setCancelled(true);
+            return;
         }
 
         // 2. Scavenging Level 0 materials & picking up markers in Adventure mode
@@ -453,9 +477,68 @@ public final class BackroomsListeners implements Listener {
         player.removePotionEffect(PotionEffectType.DARKNESS);
         player.removePotionEffect(PotionEffectType.NAUSEA);
         player.removePotionEffect(PotionEffectType.POISON);
+        if (plugin.getHallucinations() != null) {
+            plugin.getHallucinations().reduceFatigue(player, 0.30);
+        }
         consumeOne(player, held);
         player.playSound(player, Sound.BLOCK_WOOL_PLACE, SoundCategory.PLAYERS, 0.7f, 1.25f);
-        player.sendActionBar(Component.text("Перев'язка: +6 HP", NamedTextColor.GREEN));
+        player.sendActionBar(Component.text("Перев'язка: +6 HP та ясність розуму", NamedTextColor.GREEN));
+    }
+
+    private void applyCarpetLiquidToxicity(Player player, String msg) {
+        long now = System.currentTimeMillis();
+        UUID uid = player.getUniqueId();
+        if (now - lastInteractAtMs.getOrDefault(uid, 0L) < 800L) {
+            return;
+        }
+        lastInteractAtMs.put(uid, now);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.NAUSEA, 140, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 100, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.HUNGER, 120, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 60, 0, false, false, false));
+        player.playSound(player, Sound.ENTITY_GENERIC_DRINK, SoundCategory.PLAYERS, 0.55f, 0.72f);
+        player.sendActionBar(Component.text(msg, NamedTextColor.RED));
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onConsume(PlayerItemConsumeEvent event) {
+        Player player = event.getPlayer();
+        if (!plugin.getItems().isItem(event.getItem(), BackroomsItems.ID_ALMOND_WATER)) {
+            return;
+        }
+        double maxHp = 20.0;
+        var attr = player.getAttribute(Attribute.MAX_HEALTH);
+        if (attr != null) {
+            maxHp = attr.getValue();
+        }
+        player.setHealth(Math.min(maxHp, player.getHealth() + 8.0));
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
+        player.removePotionEffect(PotionEffectType.NAUSEA);
+        player.removePotionEffect(PotionEffectType.POISON);
+        player.removePotionEffect(PotionEffectType.DARKNESS);
+        player.removePotionEffect(PotionEffectType.HUNGER);
+        if (plugin.getHallucinations() != null) {
+            plugin.getHallucinations().resetFatigueWithCalm(player, 180_000L);
+        }
+        player.sendActionBar(Component.text("Мигдальна вода: голод, насиченість і розум відновлено!", NamedTextColor.GOLD));
+
+        EquipmentSlot slot = event.getHand();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            ItemStack left = slot == EquipmentSlot.OFF_HAND
+                    ? player.getInventory().getItemInOffHand()
+                    : player.getInventory().getItemInMainHand();
+            if (left.getType() == Material.GLASS_BOTTLE && plugin.getItems().getItemId(left) == null) {
+                if (slot == EquipmentSlot.OFF_HAND) {
+                    player.getInventory().setItemInOffHand(null);
+                } else {
+                    player.getInventory().setItemInMainHand(null);
+                }
+            }
+        });
     }
 
     private boolean tryPlaceMarker(Player player, Block floor, ItemStack held) {
@@ -542,7 +625,11 @@ public final class BackroomsListeners implements Listener {
                 if (hasCrowbar || rng.nextDouble() < 0.35) {
                     giveOrDrop(player, items.copperWire(1), soundLoc);
                 }
-                player.playSound(soundLoc, "minecraft:backrooms.fx.metal_pry", SoundCategory.BLOCKS, 0.75f, 0.95f);
+                if (rng.nextDouble() < (hasCrowbar ? 0.14 : 0.08)) {
+                    giveOrDrop(player, items.almondWater(1), soundLoc);
+                    player.sendActionBar(Component.text("У вентиляції знайдено пляшку Мигдальної води!", NamedTextColor.GOLD));
+                }
+                player.playSound(soundLoc, "minecraft:backrooms.fx.metal_pry", SoundCategory.BLOCKS, 0.65f, 0.95f);
                 return true;
             }
             case POLISHED_ANDESITE -> {
@@ -602,9 +689,9 @@ public final class BackroomsListeners implements Listener {
             event.setCancelled(true);
             return;
         }
-        // Keep saturation comfortable; survival stress comes from disorientation and Red Rooms
-        if (event.getFoodLevel() < 14) {
-            event.setFoodLevel(14);
+        // Allow gradual exhaustion down to 4 drumsticks so Almond Water matters without lethal starvation
+        if (event.getFoodLevel() < 4) {
+            event.setFoodLevel(4);
         }
     }
 
@@ -637,5 +724,8 @@ public final class BackroomsListeners implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         clearPlayerState(event.getPlayer());
+        if (plugin.getHallucinations() != null) {
+            plugin.getHallucinations().clearPlayerState(event.getPlayer());
+        }
     }
 }

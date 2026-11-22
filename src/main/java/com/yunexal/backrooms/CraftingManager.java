@@ -29,6 +29,7 @@ public final class CraftingManager implements Listener {
     private final NamespacedKey keyFlashlight;
     private final NamespacedKey keyMarker;
     private final NamespacedKey keyDryWallpaper;
+    private final NamespacedKey keyBrokenCompass;
 
     public CraftingManager(YunexalBackroomsPlugin plugin, BackroomsItems items) {
         this.plugin = plugin;
@@ -39,6 +40,7 @@ public final class CraftingManager implements Listener {
         this.keyFlashlight = new NamespacedKey(plugin, "recipe_flashlight");
         this.keyMarker = new NamespacedKey(plugin, "recipe_marker");
         this.keyDryWallpaper = new NamespacedKey(plugin, "recipe_dry_wallpaper");
+        this.keyBrokenCompass = new NamespacedKey(plugin, "recipe_broken_compass");
     }
 
     public void registerRecipes() {
@@ -92,11 +94,19 @@ public final class CraftingManager implements Listener {
         dw.addIngredient(damp);
         dw.addIngredient(wallpaper);
         Bukkit.addRecipe(dw);
+
+        // 7. Anomalous Broken Compass (3x3 workbench: metal plates around wire & lamp shard)
+        ShapedRecipe bc = new ShapedRecipe(keyBrokenCompass, items.brokenCompass());
+        bc.shape(" M ", "MWM", " S ");
+        bc.setIngredient('M', plate);
+        bc.setIngredient('W', wire);
+        bc.setIngredient('S', shard);
+        Bukkit.addRecipe(bc);
     }
 
     private void removeExisting() {
         for (NamespacedKey key : new NamespacedKey[]{
-                keyWorkbench, keyBandage, keyCrowbar, keyFlashlight, keyMarker, keyDryWallpaper
+                keyWorkbench, keyBandage, keyCrowbar, keyFlashlight, keyMarker, keyDryWallpaper, keyBrokenCompass
         }) {
             Bukkit.removeRecipe(key);
         }
@@ -150,5 +160,7 @@ public final class CraftingManager implements Listener {
                 .append(Component.text("Уламок лампи над Мідним дротом над Пластиною", NamedTextColor.WHITE)));
         player.sendMessage(Component.text("▸ Просушити шпалери (2x2): ", NamedTextColor.GRAY)
                 .append(Component.text("Вологі шпалери + Сухі шпалери → 2× Шматки шпалер", NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("▸ Аномальний компас (верстак 3x3): ", NamedTextColor.AQUA)
+                .append(Component.text("4× Пластини навколо Дроту + Уламок лампи знизу", NamedTextColor.WHITE)));
     }
 }

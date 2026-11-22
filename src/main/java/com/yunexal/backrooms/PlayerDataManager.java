@@ -51,6 +51,11 @@ public final class PlayerDataManager {
         yml.set("location.yaw", (double) loc.getYaw());
         yml.set("location.pitch", (double) loc.getPitch());
         yml.set("health", player.getHealth());
+        yml.set("food", player.getFoodLevel());
+        yml.set("saturation", (double) player.getSaturation());
+        if (plugin.getHallucinations() != null) {
+            yml.set("fatigue", plugin.getHallucinations().getFatigue(player));
+        }
 
         PlayerInventory inv = player.getInventory();
         yml.set("inventory.storage", inv.getStorageContents());
@@ -106,6 +111,11 @@ public final class PlayerDataManager {
 
         double hp = yml.getDouble("health", 20.0);
         player.setHealth(Math.max(2.0, Math.min(20.0, hp)));
+        player.setFoodLevel(Math.max(4, Math.min(20, yml.getInt("food", 20))));
+        player.setSaturation((float) Math.max(0.0, Math.min(20.0, yml.getDouble("saturation", 20.0))));
+        if (plugin.getHallucinations() != null) {
+            plugin.getHallucinations().setFatigue(player, yml.getDouble("fatigue", 0.0));
+        }
 
         if (!yml.contains("location.x")) {
             return null;
