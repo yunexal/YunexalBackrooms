@@ -7,6 +7,7 @@ limbo void block) + synthesized CC0 ambient OGG audio, and packages dist/Yunexal
 
 import hashlib
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -238,8 +239,7 @@ def generate_textures():
     manila = np.zeros((32, 32, 3), dtype=np.float32)
     manila[:, :] = [224, 210, 178]
     manila += rng.normal(0, 3.0, (32, 32, 1))
-    manila[0, :] -= [10, 10, 8]
-    manila[28:32, :] = [96, 74, 52]
+    manila[0, :] -= [6, 6, 5]
     save_png(manila, "white_terracotta.png")
 
     # 13. Red Room Crimson Wallpaper (red_terracotta.png)
@@ -247,7 +247,6 @@ def generate_textures():
     red_wp[:, :, 0] = np.clip(red_wp[:, :, 0] * 0.85, 0, 255)
     red_wp[:, :, 1] = np.clip(red_wp[:, :, 1] * 0.24, 0, 255)
     red_wp[:, :, 2] = np.clip(red_wp[:, :, 2] * 0.26, 0, 255)
-    red_wp[27:32, :] = [34, 12, 14]
     save_png(red_wp, "red_terracotta.png")
 
     # 14. Red Room Crimson Carpet (red_wool.png)
@@ -301,6 +300,73 @@ def generate_textures():
         outlet[sy:sy + 2, 17] = [32, 30, 28]
         outlet[sy + 2, 15:17] = [44, 42, 38]
     save_png(outlet, "cyan_terracotta.png")
+
+    # 18. Bacteria Entity Pitch-Black Twisted Tendril Rig Texture (black_glazed_terracotta.png)
+    rng_b = np.random.default_rng(1515)
+    bac = np.zeros((32, 32, 3), dtype=np.float32) + 8.0
+    bac += rng_b.uniform(0, 6.0, (32, 32, 1))
+    for y in range(32):
+        for x in range(32):
+            wave = math.sin(x * 0.55 + y * 0.28) + math.cos(y * 0.65 - x * 0.22)
+            if abs(wave) < 0.38:
+                bac[y, x] = [20, 19, 17]
+    save_png(bac, "black_glazed_terracotta.png")
+
+    # 19. Hound Entity Matted Gray/Pallid Hide Texture (gray_glazed_terracotta.png)
+    rng_h = np.random.default_rng(1616)
+    hnd = np.zeros((32, 32, 3), dtype=np.float32)
+    hnd[:, :] = [74, 70, 66]
+    hnd += rng_h.normal(0, 9.0, (32, 32, 1))
+    for _ in range(28):
+        hx, hy = rng_h.integers(0, 30, size=2)
+        hnd[hy:hy + 2, hx:hx + 3] -= [18, 18, 17]
+    save_png(hnd, "gray_glazed_terracotta.png")
+
+    # 20. Smiler & Hound Custom Item Display Sprites (1.21.4+ / 26.3 items/ + models/item/ + textures/item/)
+    item_tex_dir = os.path.join(PACK_DIR, "assets", "minecraft", "textures", "item")
+    item_model_dir = os.path.join(PACK_DIR, "assets", "minecraft", "models", "item")
+    item_def_dir = os.path.join(PACK_DIR, "assets", "minecraft", "items")
+    os.makedirs(item_tex_dir, exist_ok=True)
+    os.makedirs(item_model_dir, exist_ok=True)
+    os.makedirs(item_def_dir, exist_ok=True)
+
+    # Smiler: Pure transparent backdrop + glowing white eyes and wide jagged grin
+    smiler = np.zeros((32, 32, 4), dtype=np.uint8)
+    # Two hollow/piercing white eyes
+    for ey, ex in ((9, 8), (9, 20)):
+        for dy in range(4):
+            for dx in range(4):
+                if (dx in (0, 3) and dy in (0, 3)):
+                    continue
+                smiler[ey + dy, ex + dx] = [255, 255, 255, 255]
+    # Wide crescent grin with sharp teeth gaps
+    smile_pts = [
+        (17, 5), (18, 6), (19, 6), (20, 7), (21, 8), (22, 9), (22, 10),
+        (23, 11), (23, 12), (23, 13), (23, 14), (23, 15), (23, 16), (23, 17), (23, 18), (23, 19), (23, 20),
+        (22, 21), (22, 22), (21, 23), (20, 24), (19, 25), (18, 25), (17, 26),
+        (21, 11), (21, 14), (21, 17), (21, 20),
+        (24, 10), (24, 13), (24, 16), (24, 19), (24, 22),
+    ]
+    for sy, sx in smile_pts:
+        smiler[sy, sx] = [255, 255, 255, 255]
+        if sy + 1 < 32 and (sx % 3 != 0):
+            smiler[sy + 1, sx] = [245, 245, 255, 240]
+    Image.fromarray(smiler, mode="RGBA").save(os.path.join(item_tex_dir, "backrooms_smiler.png"))
+
+    # Hound eyes sprite
+    hound_eyes = np.zeros((32, 32, 4), dtype=np.uint8)
+    for ey, ex in ((14, 9), (14, 20)):
+        hound_eyes[ey:ey + 2, ex:ex + 3] = [255, 228, 140, 255]
+    Image.fromarray(hound_eyes, mode="RGBA").save(os.path.join(item_tex_dir, "backrooms_hound_eyes.png"))
+
+    for item_name in ("backrooms_smiler", "backrooms_hound_eyes"):
+        write_json(os.path.join(item_model_dir, f"{item_name}.json"), {
+            "parent": "minecraft:item/generated",
+            "textures": {"layer0": f"minecraft:item/{item_name}"}
+        })
+        write_json(os.path.join(item_def_dir, f"{item_name}.json"), {
+            "model": {"type": "minecraft:model", "model": f"minecraft:item/{item_name}"}
+        })
 
 
 def _next_pow2(n):
@@ -665,6 +731,61 @@ def generate_audio():
     st_lr = fade_edges(st_lr, sr, fade_in_s=0.02, fade_out_s=0.08)
     synth_ogg(st_lr, os.path.join(SND_DIR, "radio_static.ogg"), sr, drive=1.05, target_peak=0.22)
 
+    # 13. entity_bacteria_roar.ogg (2.1s 48kHz uncanny analog-distorted VHS howl)
+    dur_br = 2.1
+    nbr = int(sr * dur_br)
+    tbr = np.linspace(0.0, dur_br, nbr, endpoint=False)
+    f_fm = 215.0 + 95.0 * np.sin(2.0 * np.pi * 6.5 * tbr) - 65.0 * (tbr / dur_br)
+    ph_br = 2.0 * np.pi * np.cumsum(f_fm) / sr
+    howl = (
+        0.45 * np.sin(ph_br)
+        + 0.34 * np.sin(2.03 * ph_br + 0.8 * np.sin(2.0 * np.pi * 31.0 * tbr))
+        + 0.22 * np.sin(3.91 * ph_br)
+        + 0.38 * np.sin(2.0 * np.pi * 68.0 * tbr)
+    )
+    grit = fft_band(rng.normal(0.0, 1.0, (nbr, 2)), sr, low_hz=600.0, high_hz=3800.0, order=2.0)
+    br_env = np.sin(np.pi * tbr / dur_br) ** 0.55 * (0.75 + 0.25 * np.sin(2.0 * np.pi * 11.0 * tbr))
+    br_lr = (np.column_stack((howl, howl * 0.96)) * 0.65 + grit * 0.26) * br_env[:, None]
+    br_lr = corridor_reverb(br_lr, sr, rt60=1.25, wet=0.45, bright_hz=2400.0, seed=141)
+    br_lr = fade_edges(br_lr, sr, fade_in_s=0.04, fade_out_s=0.45)
+    synth_ogg(br_lr, os.path.join(SND_DIR, "entity_bacteria_roar.ogg"), sr, drive=1.65, target_peak=0.52)
+
+    # 14. entity_bacteria_step.ogg (0.4s 48kHz rapid wet-scuttling thump)
+    dur_bs = 0.4
+    nbs = int(sr * dur_bs)
+    tbs = np.linspace(0.0, dur_bs, nbs, endpoint=False)
+    step_tap = ensure_stereo(0.6 * np.sin(2.0 * np.pi * 95.0 * tbs) * np.exp(-26.0 * tbs))
+    scrape_b = fft_band(rng.normal(0.0, 1.0, (nbs, 2)), sr, low_hz=450.0, high_hz=2600.0, order=2.0) * np.exp(-32.0 * tbs)[:, None]
+    bs_lr = corridor_reverb(step_tap + scrape_b * 0.35, sr, rt60=0.40, wet=0.28, bright_hz=1800.0, seed=142)
+    bs_lr = fade_edges(bs_lr, sr, fade_in_s=0.004, fade_out_s=0.08)
+    synth_ogg(bs_lr, os.path.join(SND_DIR, "entity_bacteria_step.ogg"), sr, drive=1.15, target_peak=0.38)
+
+    # 15. entity_smiler_hiss.ogg (1.6s 48kHz cold darkness static hiss & sub drop)
+    dur_sh = 1.6
+    nsh = int(sr * dur_sh)
+    tsh = np.linspace(0.0, dur_sh, nsh, endpoint=False)
+    hiss_env = (np.sin(np.pi * tsh / dur_sh) ** 0.7) * (0.8 + 0.2 * np.sin(2.0 * np.pi * 19.0 * tsh))
+    hiss_air = fft_band(rng.normal(0.0, 1.0, (nsh, 2)), sr, low_hz=900.0, high_hz=4400.0, order=2.0)
+    sub_sh = ensure_stereo(0.35 * np.sin(2.0 * np.pi * 54.0 * tsh) * np.exp(-1.5 * tsh))
+    sh_lr = (hiss_air * 0.6 + sub_sh) * hiss_env[:, None]
+    sh_lr = corridor_reverb(sh_lr, sr, rt60=0.95, wet=0.40, bright_hz=2600.0, seed=151)
+    sh_lr = fade_edges(sh_lr, sr, fade_in_s=0.08, fade_out_s=0.32)
+    synth_ogg(sh_lr, os.path.join(SND_DIR, "entity_smiler_hiss.ogg"), sr, drive=1.2, target_peak=0.46)
+
+    # 16. entity_hound_growl.ogg (1.3s 48kHz guttural chest snarl in corridor)
+    dur_hg = 1.3
+    nhg = int(sr * dur_hg)
+    thg = np.linspace(0.0, dur_hg, nhg, endpoint=False)
+    glottal = 0.55 + 0.45 * np.sin(2.0 * np.pi * 24.0 * thg)
+    snarl_f = 84.0 + 18.0 * np.sin(2.0 * np.pi * 3.0 * thg)
+    ph_hg = 2.0 * np.pi * np.cumsum(snarl_f) / sr
+    throat = (0.55 * np.sin(ph_hg) + 0.35 * np.sin(2.0 * ph_hg) + 0.20 * np.sin(3.0 * ph_hg)) * glottal
+    teeth = fft_band(rng.normal(0.0, 1.0, (nhg, 2)), sr, low_hz=1100.0, high_hz=3600.0, order=2.0) * (np.sin(np.pi * thg / dur_hg) ** 0.9)[:, None]
+    hg_lr = (np.column_stack((throat, throat * 0.95)) * 0.65 + teeth * 0.25) * (np.sin(np.pi * thg / dur_hg) ** 0.6)[:, None]
+    hg_lr = corridor_reverb(hg_lr, sr, rt60=0.75, wet=0.35, bright_hz=2000.0, seed=161)
+    hg_lr = fade_edges(hg_lr, sr, fade_in_s=0.05, fade_out_s=0.25)
+    synth_ogg(hg_lr, os.path.join(SND_DIR, "entity_hound_growl.ogg"), sr, drive=1.55, target_peak=0.48)
+
     write_json(os.path.join(PACK_DIR, "assets", "minecraft", "sounds.json"), {
         "backrooms.ambient.hum": {
             "sounds": [{"name": "backrooms/fluorescent_hum", "stream": False}]
@@ -701,6 +822,18 @@ def generate_audio():
         },
         "backrooms.fx.radio_static": {
             "sounds": [{"name": "backrooms/radio_static", "stream": False}]
+        },
+        "backrooms.entity.bacteria.roar": {
+            "sounds": [{"name": "backrooms/entity_bacteria_roar", "stream": False}]
+        },
+        "backrooms.entity.bacteria.step": {
+            "sounds": [{"name": "backrooms/entity_bacteria_step", "stream": False}]
+        },
+        "backrooms.entity.smiler.hiss": {
+            "sounds": [{"name": "backrooms/entity_smiler_hiss", "stream": False}]
+        },
+        "backrooms.entity.hound.growl": {
+            "sounds": [{"name": "backrooms/entity_hound_growl", "stream": False}]
         },
     })
 

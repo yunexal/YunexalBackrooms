@@ -289,7 +289,7 @@ public final class LimboManager implements Listener {
 
         Location targetLoc = plugin.getPlayerData().loadAndRestore(player, level0);
         boolean firstEntry = (targetLoc == null);
-        if (firstEntry) {
+        if (firstEntry || plugin.getBackroomsConfig().isRandomSpawnOnEveryJoin()) {
             targetLoc = plugin.getLevel0Generator().findRandomFarSpawn(
                     level0, Bukkit.getOnlinePlayers(), plugin.getBackroomsConfig().getSpawnRadius());
         }

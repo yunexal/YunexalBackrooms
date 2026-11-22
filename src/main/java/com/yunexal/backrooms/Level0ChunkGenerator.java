@@ -583,7 +583,7 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         Location bestFallback = null;
         double bestMinDistSq = -1.0;
 
-        for (int attempt = 0; attempt < 64; attempt++) {
+        for (int attempt = 0; attempt < 96; attempt++) {
             int cx = rng.nextInt(-cellRadius, cellRadius + 1);
             int cz = rng.nextInt(-cellRadius, cellRadius + 1);
             ZoneType zone = getZoneType(seed, cx, cz);

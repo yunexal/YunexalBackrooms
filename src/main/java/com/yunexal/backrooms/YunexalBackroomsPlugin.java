@@ -21,6 +21,7 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
     private BackroomsListeners listeners;
     private HallucinationManager hallucinations;
     private BodycamManager bodycam;
+    private BackroomsEntityManager entities;
     private BackroomsVoicePlugin voicePlugin;
 
     @Override
@@ -47,10 +48,12 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         this.listeners = new BackroomsListeners(this);
         this.hallucinations = new HallucinationManager(this);
         this.bodycam = new BodycamManager(this);
+        this.entities = new BackroomsEntityManager(this);
 
         getServer().getPluginManager().registerEvents(craftingManager, this);
         getServer().getPluginManager().registerEvents(limboManager, this);
         getServer().getPluginManager().registerEvents(listeners, this);
+        getServer().getPluginManager().registerEvents(entities, this);
 
         BackroomsCommand cmd = new BackroomsCommand(this);
         PluginCommand pluginCmd = getCommand("backrooms");
@@ -65,6 +68,7 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
             this.listeners.start();
             this.hallucinations.start();
             this.bodycam.start();
+            this.entities.start();
             registerVoiceChatHook();
             getLogger().info("YunexalBackrooms worlds ready: Level 0='"
                     + backroomsConfig.getLevel0WorldName() + "', Limbo='"
@@ -87,6 +91,9 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         }
         if (bodycam != null) {
             bodycam.shutdown();
+        }
+        if (entities != null) {
+            entities.shutdown();
         }
         if (voicePlugin != null) {
             voicePlugin.shutdown();
@@ -126,6 +133,9 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         this.voidGenerator = new VoidChunkGenerator(this.backroomsConfig);
         if (Bukkit.getServer() != null) {
             configureLevel0WorldRules();
+            if (entities != null) {
+                entities.reloadFromConfig();
+            }
         }
     }
 
@@ -204,6 +214,10 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
 
     public BodycamManager getBodycam() {
         return bodycam;
+    }
+
+    public BackroomsEntityManager getEntities() {
+        return entities;
     }
 
     public @Nullable World getLevel0World() {

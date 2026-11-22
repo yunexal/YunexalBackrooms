@@ -5,7 +5,7 @@
 resource-pack:
   enabled: true
   url: "https://mirror.yunexal.com/packs/YunexalBackrooms-RP.zip"
-  sha1: "749f9aa45bde0a0f637a28a117df9f554c9c9cb8"
+  sha1: "7ef8284542e603d87d3f48c1b35917b48403e578"
   required: true
   prompt: "&e&lYUNEXAL BACKROOMS\n&7Для входу на &fРівень 0 «Лобі» &7обов'язково прийміть ресурс-пак.\n&8Кастомні текстури, Манільська та Червона кімнати, 48kHz аудіо."
   timeout-seconds: 45
@@ -28,6 +28,7 @@ level0:
   simulation-distance: 6
   world-border-size: 10000.0
   spawn-radius: 3800
+  random-spawn-on-every-join: false
   extra-braiding-chance: 0.34
   pillar-hall-chance: 0.16
   narrow-maze-chance: 0.18
@@ -53,3 +54,12 @@ ambient:
 bodycam:
   enabled: true
   intensity: 1.0
+
+entities:
+  enabled: true
+  # Повністю підготовлені (Bacteria, Smiler, Hound). Увімкнути живий автоспавн: /br entity autospawn on
+  auto-spawn: false
+  auto-spawn-interval-seconds: 110
+  auto-spawn-chance: 0.25
+  max-global: 6
+  despawn-distance: 46

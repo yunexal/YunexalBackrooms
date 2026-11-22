@@ -37,6 +37,7 @@ public final class BackroomsConfig {
     private final int simulationDistance;
     private final double worldBorderSize;
     private final int spawnRadius;
+    private final boolean randomSpawnOnEveryJoin;
     private final double extraBraidingChance;
     private final double pillarHallChance;
     private final double narrowMazeChance;
@@ -58,6 +59,12 @@ public final class BackroomsConfig {
     private final double distantThumpChance;
     private final boolean bodycamEnabled;
     private final double bodycamIntensity;
+    private final boolean entitiesEnabled;
+    private final boolean entitiesAutoSpawn;
+    private final int entitiesAutoSpawnIntervalSeconds;
+    private final double entitiesAutoSpawnChance;
+    private final int entitiesMaxGlobal;
+    private final int entitiesDespawnDistance;
 
     public BackroomsConfig(FileConfiguration cfg) {
         this.rpEnabled = cfg.getBoolean("resource-pack.enabled", true);
@@ -88,6 +95,7 @@ public final class BackroomsConfig {
         this.simulationDistance = Math.max(3, Math.min(16, cfg.getInt("level0.simulation-distance", 6)));
         this.worldBorderSize = Math.max(256.0, cfg.getDouble("level0.world-border-size", 10000.0));
         this.spawnRadius = Math.max(64, cfg.getInt("level0.spawn-radius", 3800));
+        this.randomSpawnOnEveryJoin = cfg.getBoolean("level0.random-spawn-on-every-join", false);
         this.extraBraidingChance = clamp01(cfg.getDouble("level0.extra-braiding-chance", 0.34));
         this.pillarHallChance = clamp01(cfg.getDouble("level0.pillar-hall-chance", 0.16));
         this.narrowMazeChance = clamp01(cfg.getDouble("level0.narrow-maze-chance", 0.18));
@@ -109,6 +117,13 @@ public final class BackroomsConfig {
         this.distantThumpChance = clamp01(cfg.getDouble("ambient.distant-thump-chance", 0.015));
         this.bodycamEnabled = cfg.getBoolean("bodycam.enabled", true);
         this.bodycamIntensity = Math.max(0.1, Math.min(2.5, cfg.getDouble("bodycam.intensity", 1.0)));
+
+        this.entitiesEnabled = cfg.getBoolean("entities.enabled", true);
+        this.entitiesAutoSpawn = cfg.getBoolean("entities.auto-spawn", false);
+        this.entitiesAutoSpawnIntervalSeconds = Math.max(15, cfg.getInt("entities.auto-spawn-interval-seconds", 110));
+        this.entitiesAutoSpawnChance = clamp01(cfg.getDouble("entities.auto-spawn-chance", 0.25));
+        this.entitiesMaxGlobal = Math.max(1, Math.min(32, cfg.getInt("entities.max-global", 6)));
+        this.entitiesDespawnDistance = Math.max(20, Math.min(96, cfg.getInt("entities.despawn-distance", 46)));
     }
 
     private static double clamp01(double v) {
@@ -152,6 +167,7 @@ public final class BackroomsConfig {
     public int getSimulationDistance() { return simulationDistance; }
     public double getWorldBorderSize() { return worldBorderSize; }
     public int getSpawnRadius() { return spawnRadius; }
+    public boolean isRandomSpawnOnEveryJoin() { return randomSpawnOnEveryJoin; }
     public double getExtraBraidingChance() { return extraBraidingChance; }
     public double getPillarHallChance() { return pillarHallChance; }
     public double getNarrowMazeChance() { return narrowMazeChance; }
@@ -173,4 +189,11 @@ public final class BackroomsConfig {
     public double getDistantThumpChance() { return distantThumpChance; }
     public boolean isBodycamEnabled() { return bodycamEnabled; }
     public double getBodycamIntensity() { return bodycamIntensity; }
+
+    public boolean isEntitiesEnabled() { return entitiesEnabled; }
+    public boolean isEntitiesAutoSpawn() { return entitiesAutoSpawn; }
+    public int getEntitiesAutoSpawnIntervalSeconds() { return entitiesAutoSpawnIntervalSeconds; }
+    public double getEntitiesAutoSpawnChance() { return entitiesAutoSpawnChance; }
+    public int getEntitiesMaxGlobal() { return entitiesMaxGlobal; }
+    public int getEntitiesDespawnDistance() { return entitiesDespawnDistance; }
 }
