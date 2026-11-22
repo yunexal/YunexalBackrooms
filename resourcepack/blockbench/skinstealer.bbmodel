@@ -1,0 +1,1562 @@
+{
+  "meta": {
+    "format_version": "4.10",
+    "model_format": "java_block",
+    "box_uv": false
+  },
+  "name": "skinstealer",
+  "resolution": {
+    "width": 64,
+    "height": 64
+  },
+  "elements": [
+    {
+      "name": "skinstealer_torso_0",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -3.0,
+        15.0,
+        -1.7999999999999998
+      ],
+      "to": [
+        3.0,
+        27.5,
+        1.8000000000000007
+      ],
+      "rotation": [
+        22.5,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        22,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "093dffae-278e-51d9-b8af-560a99b2dc88"
+    },
+    {
+      "name": "skinstealer_torso_1",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -1.0999999999999996,
+        17.2,
+        -2.25
+      ],
+      "to": [
+        1.0999999999999996,
+        25.8,
+        -1.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        18,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "63155269-a471-5d1e-8bae-683950cd2c5d"
+    },
+    {
+      "name": "skinstealer_torso_2",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -3.3,
+        16.0,
+        -1.5
+      ],
+      "to": [
+        3.3000000000000007,
+        22.2,
+        1.9000000000000004
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        18,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "c6450222-672e-545d-a20d-955c2bde8d79"
+    },
+    {
+      "name": "skinstealer_head_0",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -3.5999999999999996,
+        29.0,
+        -4.6
+      ],
+      "to": [
+        3.5999999999999996,
+        36.4,
+        2.4000000000000004
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        29,
+        -1
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "3820edef-61a7-5597-a8c4-ed0119cc52d5"
+    },
+    {
+      "name": "skinstealer_head_1",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -2.8,
+        29.4,
+        -4.9
+      ],
+      "to": [
+        2.8000000000000007,
+        31.6,
+        -3.8
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        29,
+        -1
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "90aa02a0-16aa-533d-a63b-12aae2c91d6b"
+    },
+    {
+      "name": "skinstealer_eyes_0",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -2.8,
+        32.6,
+        -4.85
+      ],
+      "to": [
+        -1.0,
+        34.0,
+        -4.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        29,
+        -1
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "b01d5b05-6287-5f19-bb14-3cdfaa6d033d"
+    },
+    {
+      "name": "skinstealer_eyes_1",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        1.0,
+        32.6,
+        -4.85
+      ],
+      "to": [
+        2.8000000000000007,
+        34.0,
+        -4.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        29,
+        -1
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "f7a2509b-d8bc-5d74-bfc8-c98b16efb59e"
+    },
+    {
+      "name": "skinstealer_arm_left_0",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        3.3999999999999995,
+        18.0,
+        -1.4000000000000004
+      ],
+      "to": [
+        6.2,
+        28.0,
+        1.4000000000000004
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        4.8,
+        27,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "1693e6c3-8186-5e58-aa5d-0272d192dc9b"
+    },
+    {
+      "name": "skinstealer_arm_left_1",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        3.5,
+        10.8,
+        -1.7999999999999998
+      ],
+      "to": [
+        6.1000000000000005,
+        18.0,
+        0.8000000000000007
+      ],
+      "rotation": [
+        22.5,
+        0,
+        0
+      ],
+      "origin": [
+        4.8,
+        18,
+        -0.20000000000000018
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "a0479b03-a279-5d94-89a1-cc3d95099a11"
+    },
+    {
+      "name": "skinstealer_arm_left_2",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        3.5999999999999996,
+        8.5,
+        -2.5
+      ],
+      "to": [
+        5.999999999999999,
+        11.2,
+        -0.20000000000000018
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        4.8,
+        27,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "40edfdd2-c25d-5471-a736-1c3f37cded09"
+    },
+    {
+      "name": "skinstealer_arm_right_0",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -6.2,
+        18.0,
+        -1.4000000000000004
+      ],
+      "to": [
+        -3.3999999999999995,
+        28.0,
+        1.4000000000000004
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        -4.8,
+        27,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "d4ad8372-1a8a-5af5-9969-ac929a79e04d"
+    },
+    {
+      "name": "skinstealer_arm_right_1",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -6.1,
+        10.8,
+        -1.7999999999999998
+      ],
+      "to": [
+        -3.499999999999999,
+        18.0,
+        0.8000000000000007
+      ],
+      "rotation": [
+        22.5,
+        0,
+        0
+      ],
+      "origin": [
+        -4.8,
+        18,
+        -0.20000000000000018
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "7a423d01-7949-54a7-b954-91ffaf61bc3c"
+    },
+    {
+      "name": "skinstealer_arm_right_2",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -6.0,
+        8.5,
+        -2.5
+      ],
+      "to": [
+        -3.6000000000000005,
+        11.2,
+        -0.20000000000000018
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        -4.8,
+        27,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "74316e5d-f744-5bfd-abfa-30be4745fe6f"
+    },
+    {
+      "name": "skinstealer_leg_left_0",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        0.6000000000000001,
+        0.0,
+        -1.5
+      ],
+      "to": [
+        3.6,
+        15.0,
+        1.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        2.1,
+        15,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "7ab78a7f-03ce-5f53-b958-c42185d884e8"
+    },
+    {
+      "name": "skinstealer_leg_left_1",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        0.8000000000000003,
+        -0.1999999999999993,
+        -2.0
+      ],
+      "to": [
+        3.400000000000001,
+        2.5,
+        -0.7999999999999998
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        2.1,
+        15,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "d6487d4b-ab2e-58bd-b85a-2ebe90f406c0"
+    },
+    {
+      "name": "skinstealer_leg_right_0",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -3.6,
+        0.0,
+        -1.5
+      ],
+      "to": [
+        -0.6000000000000001,
+        15.0,
+        1.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        -2.1,
+        15,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "629ce91c-e825-5d5f-b6c1-f8e547768825"
+    },
+    {
+      "name": "skinstealer_leg_right_1",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -3.4,
+        -0.1999999999999993,
+        -2.0
+      ],
+      "to": [
+        -0.7999999999999994,
+        2.5,
+        -0.7999999999999998
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        -2.1,
+        15,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "d22183b7-20d0-502d-9727-2730de16b72f"
+    }
+  ],
+  "outliner": [
+    {
+      "name": "skinstealer_torso",
+      "origin": [
+        0,
+        18,
+        0
+      ],
+      "color": 0,
+      "uuid": "9270a1fa-31ea-59cd-a039-7257fcc46507",
+      "export": true,
+      "isOpen": true,
+      "visibility": true,
+      "children": [
+        "093dffae-278e-51d9-b8af-560a99b2dc88",
+        "63155269-a471-5d1e-8bae-683950cd2c5d",
+        "c6450222-672e-545d-a20d-955c2bde8d79"
+      ]
+    },
+    {
+      "name": "skinstealer_head",
+      "origin": [
+        0,
+        29,
+        -1
+      ],
+      "color": 0,
+      "uuid": "0c1915c1-da03-5902-931f-8395568bf6d0",
+      "export": true,
+      "isOpen": true,
+      "visibility": true,
+      "children": [
+        "3820edef-61a7-5597-a8c4-ed0119cc52d5",
+        "90aa02a0-16aa-533d-a63b-12aae2c91d6b"
+      ]
+    },
+    {
+      "name": "skinstealer_eyes",
+      "origin": [
+        0,
+        29,
+        -1
+      ],
+      "color": 0,
+      "uuid": "3fd6da00-e63c-52c9-85c6-219ee9c2877c",
+      "export": true,
+      "isOpen": true,
+      "visibility": true,
+      "children": [
+        "b01d5b05-6287-5f19-bb14-3cdfaa6d033d",
+        "f7a2509b-d8bc-5d74-bfc8-c98b16efb59e"
+      ]
+    },
+    {
+      "name": "skinstealer_arm_left",
+      "origin": [
+        4.8,
+        27,
+        0
+      ],
+      "color": 0,
+      "uuid": "c5355153-0191-5cc5-9b38-f435abef643e",
+      "export": true,
+      "isOpen": true,
+      "visibility": true,
+      "children": [
+        "1693e6c3-8186-5e58-aa5d-0272d192dc9b",
+        "a0479b03-a279-5d94-89a1-cc3d95099a11",
+        "40edfdd2-c25d-5471-a736-1c3f37cded09"
+      ]
+    },
+    {
+      "name": "skinstealer_arm_right",
+      "origin": [
+        -4.8,
+        27,
+        0
+      ],
+      "color": 0,
+      "uuid": "c1c82abd-6bcf-5f8c-9e69-dad6be45c99d",
+      "export": true,
+      "isOpen": true,
+      "visibility": true,
+      "children": [
+        "d4ad8372-1a8a-5af5-9969-ac929a79e04d",
+        "7a423d01-7949-54a7-b954-91ffaf61bc3c",
+        "74316e5d-f744-5bfd-abfa-30be4745fe6f"
+      ]
+    },
+    {
+      "name": "skinstealer_leg_left",
+      "origin": [
+        2.1,
+        15,
+        0
+      ],
+      "color": 0,
+      "uuid": "aa01bba3-4188-5ee4-ba89-30573b844e3e",
+      "export": true,
+      "isOpen": true,
+      "visibility": true,
+      "children": [
+        "7ab78a7f-03ce-5f53-b958-c42185d884e8",
+        "d6487d4b-ab2e-58bd-b85a-2ebe90f406c0"
+      ]
+    },
+    {
+      "name": "skinstealer_leg_right",
+      "origin": [
+        -2.1,
+        15,
+        0
+      ],
+      "color": 0,
+      "uuid": "b2497f4d-0aed-576a-9d8b-0a2be806d14c",
+      "export": true,
+      "isOpen": true,
+      "visibility": true,
+      "children": [
+        "629ce91c-e825-5d5f-b6c1-f8e547768825",
+        "d22183b7-20d0-502d-9727-2730de16b72f"
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "name": "entity_skinstealer.png",
+      "id": "0",
+      "uuid": "394dc45f-28a7-5cdd-871e-f15157bb8eb3",
+      "source": "data:image/png;base64,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",
+      "width": 64,
+      "height": 64,
+      "uv_width": 64,
+      "uv_height": 64,
+      "visible": true
+    }
+  ]
+}

@@ -100,7 +100,7 @@ public final class BodycamManager {
         double intensity = cfg.getBodycamIntensity();
         for (Player player : Bukkit.getOnlinePlayers()) {
             UUID uid = player.getUniqueId();
-            if (!player.getWorld().equals(level0)
+            if (!plugin.isBackroomsGameplayWorld(player.getWorld())
                     || plugin.getLimboManager().isInLimbo(player)
                     || !plugin.getLimboManager().isVerified(player)
                     || disabledPlayers.contains(uid)) {
@@ -144,8 +144,17 @@ public final class BodycamManager {
 
             if (!lookingExtreme && !guiOpen) {
                 double fatigue = plugin.getHallucinations() != null ? plugin.getHallucinations().getFatigue(player) : 0.0;
-                Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator()
-                        .getZoneAtBlock(level0, loc.getBlockX(), loc.getBlockZ());
+                double redTremor = 0.0;
+                if (player.getWorld().equals(level0)) {
+                    Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator()
+                            .getZoneAtBlock(level0, loc.getBlockX(), loc.getBlockZ());
+                    if (zone == Level0ChunkGenerator.ZoneType.RED_ROOM) {
+                        redTremor = Math.sin(st.phase * 4.3) * 0.06;
+                    }
+                } else if (plugin.getLevel1Manager() != null
+                        && plugin.getLevel1Manager().getBlackoutPhase() == Level1Manager.BlackoutPhase.BLACKOUT) {
+                    redTremor = Math.sin(st.phase * 3.8) * 0.04;
+                }
 
                 double yawBreath = Math.sin(st.phase * 0.37 + 0.5) * (0.20 + fatigue * 0.16);
                 double pitchBreath = Math.sin(st.phase * 0.52) * (0.24 + fatigue * 0.20);
@@ -153,9 +162,6 @@ public final class BodycamManager {
                 double walkFactor = Math.max(0.0, Math.min(1.45, st.smoothSpeed / 0.21));
                 double yawWalk = Math.sin(st.phase) * 0.56 * walkFactor;
                 double pitchWalk = Math.sin(st.phase * 2.0 + 0.35) * 0.34 * walkFactor;
-                double redTremor = (zone == Level0ChunkGenerator.ZoneType.RED_ROOM)
-                        ? Math.sin(st.phase * 4.3) * 0.06
-                        : 0.0;
 
                 targetYaw = (float) ((yawBreath + yawWalk) * intensity);
                 targetPitch = (float) ((pitchBreath + pitchWalk + redTremor) * intensity);

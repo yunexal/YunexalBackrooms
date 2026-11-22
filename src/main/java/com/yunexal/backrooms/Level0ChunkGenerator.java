@@ -220,7 +220,8 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         }
 
         // Arched half-wall partitions (waist-high wall + arched colonnade cutout) in Pillar Halls & select corridors
-        if (!corner && zone != ZoneType.PITFALL_HALL) {
+        if (!corner && zone != ZoneType.PITFALL_HALL
+                && !isFlickeringExitPanel(seed, cx, cz, inCellZ == 0, zone)) {
             boolean northWall = (inCellZ == 0);
             int posInPanel = northWall ? inCellX : inCellZ;
             int rlx = Math.floorMod(cx, REGION_CELLS);
@@ -717,7 +718,8 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
             int cx = rng.nextInt(-cellRadius, cellRadius + 1);
             int cz = rng.nextInt(-cellRadius, cellRadius + 1);
             ZoneType zone = getZoneType(seed, cx, cz);
-            if (zone == ZoneType.RED_ROOM || zone == ZoneType.BLACKOUT_ZONE || zone == ZoneType.MANILA_ROOM) {
+            if (zone == ZoneType.RED_ROOM || zone == ZoneType.BLACKOUT_ZONE
+                    || zone == ZoneType.MANILA_ROOM || zone == ZoneType.PITFALL_HALL) {
                 continue;
             }
             if (isWallBlock(seed, cx, cz, 2, 2, zone)) {
@@ -756,6 +758,61 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         int cx = Math.floorDiv(blockX, CELL_SIZE);
         int cz = Math.floorDiv(blockZ, CELL_SIZE);
         return getZoneType(seed, cx, cz);
+    }
+
+    public boolean isFlickeringExitPanel(long seed, int cx, int cz, boolean northWall, ZoneType zone) {
+        if (zone == ZoneType.MANILA_ROOM || zone == ZoneType.RED_ROOM || zone == ZoneType.PITFALL_HALL) {
+            return false;
+        }
+        if (Math.abs(cx) <= 2 && Math.abs(cz) <= 2) {
+            return false;
+        }
+        long panelSeed = mix64(seed ^ 0x0F11CE217E8A901L, cx * 2 + (northWall ? 1 : 0), cz);
+        return toUnitDouble(panelSeed) >= 0.986;
+    }
+
+    public boolean isFlickeringExitBlock(World world, int wx, int wy, int wz) {
+        BackroomsConfig cfg = cfg();
+        if (wy < cfg.getFloorY() + 1 || wy >= cfg.getCeilingY()) {
+            return false;
+        }
+        int cx = Math.floorDiv(wx, CELL_SIZE);
+        int cz = Math.floorDiv(wz, CELL_SIZE);
+        int inCellX = Math.floorMod(wx, CELL_SIZE);
+        int inCellZ = Math.floorMod(wz, CELL_SIZE);
+        if (inCellX == 0 && inCellZ == 0) {
+            return false;
+        }
+        if (inCellX > 0 && inCellZ > 0) {
+            return false;
+        }
+        boolean northWall = (inCellZ == 0);
+        int pos = northWall ? inCellX : inCellZ;
+        if (pos != 2 && pos != 3) {
+            return false;
+        }
+        long seed = effectiveSeed(world);
+        ZoneType zone = getZoneType(seed, cx, cz);
+        if (!isFlickeringExitPanel(seed, cx, cz, northWall, zone)) {
+            return false;
+        }
+        return northWall ? hasNorthWall(seed, cx, cz) : hasWestWall(seed, cx, cz);
+    }
+
+    public Location[] getFlickeringExitBounds(World world, int wx, int wz) {
+        int cx = Math.floorDiv(wx, CELL_SIZE);
+        int cz = Math.floorDiv(wz, CELL_SIZE);
+        int inCellZ = Math.floorMod(wz, CELL_SIZE);
+        boolean northWall = (inCellZ == 0);
+        if (northWall) {
+            Location min = new Location(world, cx * CELL_SIZE + 2, 0, cz * CELL_SIZE);
+            Location max = new Location(world, cx * CELL_SIZE + 3, 0, cz * CELL_SIZE);
+            return new Location[]{min, max};
+        } else {
+            Location min = new Location(world, cx * CELL_SIZE, 0, cz * CELL_SIZE + 2);
+            Location max = new Location(world, cx * CELL_SIZE, 0, cz * CELL_SIZE + 3);
+            return new Location[]{min, max};
+        }
     }
 
     private static long mix64(long seed, int x, int z) {

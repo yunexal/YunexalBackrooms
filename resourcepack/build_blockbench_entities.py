@@ -134,6 +134,73 @@ def make_uv_atlas_hound(out_png):
     Image.fromarray(img, mode="RGBA").save(out_png)
 
 
+def make_uv_atlas_faceless(out_png):
+    """64x64 blank waxen skin (no facial features), faded dark slate coat & worn denim trousers."""
+    rng = np.random.default_rng(7404)
+    img = np.zeros((64, 64, 4), dtype=np.uint8)
+
+    # [0..32, 0..32]: Completely blank matte pale waxen skin (slightly mottled forehead/cheek tone, zero features)
+    for y in range(32):
+        for x in range(32):
+            tone = int(np.clip(206 + rng.normal(0, 2.2), 186, 218))
+            img[y, x] = [tone, int(tone * 0.89), int(tone * 0.81), 255]
+
+    # [32..64, 0..32]: Faded dusty charcoal-navy utility jacket & creased fabric
+    for y in range(32):
+        for x in range(32, 64):
+            seam = -8 if (x in (32, 47, 63) or y in (0, 15, 31)) else 0
+            v = int(np.clip(58 + seam + rng.normal(0, 3.0), 34, 80))
+            img[y, x] = [v - 4, v, v + 8, 255]
+
+    # [0..32, 32..64]: Worn dark trousers & boots
+    for y in range(32, 64):
+        for x in range(32):
+            v = int(np.clip(38 + rng.normal(0, 2.5), 22, 54))
+            img[y, x] = [v, v + 1, v + 4, 255]
+
+    # [32..64, 32..64]: Unkempt dark ash-brown hair scalp
+    for y in range(32, 64):
+        for x in range(32, 64):
+            v = int(np.clip(34 + (x % 3) * 4 + rng.normal(0, 2.5), 18, 52))
+            img[y, x] = [v + 6, v + 2, v, 255]
+
+    Image.fromarray(img, mode="RGBA").save(out_png)
+
+
+def make_uv_atlas_skinstealer(out_png):
+    """64x64 sickly clammy stolen skin, raw blood-soaked splits & milky sunken predator eyes."""
+    rng = np.random.default_rng(7505)
+    img = np.zeros((64, 64, 4), dtype=np.uint8)
+
+    # [0..32, 0..32]: Pallid clammy baggy grey-tan skin with stretch creases
+    for y in range(32):
+        for x in range(32):
+            fold = 10 * math.sin(y * 0.6)
+            r = int(np.clip(174 + fold + rng.normal(0, 4.0), 125, 200))
+            g = int(np.clip(162 + fold + rng.normal(0, 4.0), 116, 188))
+            b = int(np.clip(148 + fold + rng.normal(0, 4.0), 106, 174))
+            img[y, x] = [r, g, b, 255]
+
+    # [32..64, 0..32]: Torn crimson blood-soaked flesh seams & raw chest split
+    for y in range(32):
+        for x in range(32, 64):
+            pulse = 16 if ((x + y) % 5 == 0) else 0
+            r = int(np.clip(112 + pulse + rng.normal(0, 6.0), 68, 152))
+            img[y, x] = [r, 24, 26, 255]
+
+    # [0..32, 32..64]: Gaunt stained shirt remnants
+    for y in range(32, 64):
+        for x in range(32):
+            v = int(np.clip(74 + rng.normal(0, 4.0), 48, 96))
+            img[y, x] = [v + 6, v + 2, v - 4, 255]
+
+    # [32..64, 32..64]: Cold milky-white vacant eyes with pinpoint dark pupils
+    img[32:64, 32:64] = [232, 236, 240, 255]
+    img[44:52, 44:52] = [28, 30, 34, 255]
+
+    Image.fromarray(img, mode="RGBA").save(out_png)
+
+
 def uv_box(u_px, v_px, w_px=32, h_px=32):
     """Maps a pixel sub-region in a 64x64 atlas to Minecraft 0..16 UV box dict."""
     u1 = round(u_px * 16.0 / 64.0, 3)
@@ -274,9 +341,13 @@ def generate_blockbench_entities(pack_dir, blockbench_src_dir):
     bac_png = os.path.join(item_tex_dir, "entity_bacteria.png")
     smiler_png = os.path.join(item_tex_dir, "entity_smiler.png")
     hound_png = os.path.join(item_tex_dir, "entity_hound.png")
+    faceless_png = os.path.join(item_tex_dir, "entity_faceless.png")
+    skin_png = os.path.join(item_tex_dir, "entity_skinstealer.png")
     make_uv_atlas_bacteria(bac_png)
     make_uv_atlas_smiler(smiler_png)
     make_uv_atlas_hound(hound_png)
+    make_uv_atlas_faceless(faceless_png)
+    make_uv_atlas_skinstealer(skin_png)
 
     WIRE = (0, 0, 32, 32)
     RIB = (32, 0, 32, 32)
@@ -495,10 +566,91 @@ def generate_blockbench_entities(pack_dir, blockbench_src_dir):
         ]),
     ]
 
+    # =========================================================================
+    # FACELESS (Level 1 eerie humanoid wanderer with completely blank face)
+    # =========================================================================
+    FL_SKIN = (0, 0, 32, 32)
+    FL_COAT = (32, 0, 32, 32)
+    FL_PANT = (0, 32, 32, 32)
+    FL_HAIR = (32, 32, 32, 32)
+
+    faceless_bones = [
+        ("faceless_torso", (0, 16, 0), [
+            elem(4.5, 4.0, 6.0, 11.5, 16.0, 10.0, FL_COAT),
+            elem(4.2, 13.5, 5.7, 11.8, 16.2, 10.3, FL_COAT),
+        ]),
+        ("faceless_head", (0, 26, 0), [
+            # Completely smooth featureless blank face facing North (-Z)
+            elem(4.5, 8.0, 4.5, 11.5, 15.5, 11.5, FL_SKIN),
+            elem(4.3, 13.6, 4.4, 11.7, 15.8, 11.7, FL_HAIR),
+            elem(4.3, 9.8, 7.6, 11.7, 14.4, 11.7, FL_HAIR),
+        ]),
+        ("faceless_arm_left", (5.2, 24, 0), [
+            elem(6.3, 0.0, 6.4, 9.7, 9.5, 9.6, FL_COAT),
+            elem(6.5, -3.5, 6.6, 9.5, 0.0, 9.4, FL_SKIN),
+        ]),
+        ("faceless_arm_right", (-5.2, 24, 0), [
+            elem(6.3, 0.0, 6.4, 9.7, 9.5, 9.6, FL_COAT),
+            elem(6.5, -3.5, 6.6, 9.5, 0.0, 9.4, FL_SKIN),
+        ]),
+        ("faceless_leg_left", (2.0, 12, 0), [
+            elem(6.2, -4.0, 6.2, 9.8, 8.0, 9.8, FL_PANT),
+        ]),
+        ("faceless_leg_right", (-2.0, 12, 0), [
+            elem(6.2, -4.0, 6.2, 9.8, 8.0, 9.8, FL_PANT),
+        ]),
+    ]
+
+    # =========================================================================
+    # SKIN-STEALER (Gaunt tall Level 1 predator in torn baggy stolen flesh)
+    # =========================================================================
+    SS_SKIN = (0, 0, 32, 32)
+    SS_GORE = (32, 0, 32, 32)
+    SS_RAGS = (0, 32, 32, 32)
+    SS_EYE = (32, 32, 32, 32)
+
+    skinstealer_bones = [
+        ("skinstealer_torso", (0, 18, 0), [
+            elem(5.0, 5.0, 6.2, 11.0, 17.5, 9.8, SS_SKIN, (22.5, "x", (8, 12, 8))),
+            # Vertical torn crimson split down front ribs where flesh was crawled into
+            elem(6.9, 7.2, 5.75, 9.1, 15.8, 6.5, SS_GORE),
+            elem(4.7, 6.0, 6.5, 11.3, 12.2, 9.9, SS_RAGS),
+        ]),
+        ("skinstealer_head", (0, 29, -1), [
+            elem(4.4, 8.0, 4.4, 11.6, 15.4, 11.4, SS_SKIN),
+            elem(5.2, 8.4, 4.1, 10.8, 10.6, 5.2, SS_GORE),
+        ]),
+        ("skinstealer_eyes", (0, 29, -1), [
+            # Milky white sunken glaring eyes
+            elem(5.2, 11.6, 4.15, 7.0, 13.0, 4.5, SS_EYE),
+            elem(9.0, 11.6, 4.15, 10.8, 13.0, 4.5, SS_EYE),
+        ]),
+        ("skinstealer_arm_left", (4.8, 27, 0), [
+            elem(6.6, -1.0, 6.6, 9.4, 9.0, 9.4, SS_SKIN),
+            elem(6.7, -8.2, 6.2, 9.3, -1.0, 8.8, SS_SKIN, (22.5, "x", (8, -1, 7.8))),
+            elem(6.8, -10.5, 5.5, 9.2, -7.8, 7.8, SS_GORE),
+        ]),
+        ("skinstealer_arm_right", (-4.8, 27, 0), [
+            elem(6.6, -1.0, 6.6, 9.4, 9.0, 9.4, SS_SKIN),
+            elem(6.7, -8.2, 6.2, 9.3, -1.0, 8.8, SS_SKIN, (22.5, "x", (8, -1, 7.8))),
+            elem(6.8, -10.5, 5.5, 9.2, -7.8, 7.8, SS_GORE),
+        ]),
+        ("skinstealer_leg_left", (2.1, 15, 0), [
+            elem(6.5, -7.0, 6.5, 9.5, 8.0, 9.5, SS_SKIN),
+            elem(6.7, -7.2, 6.0, 9.3, -4.5, 7.2, SS_GORE),
+        ]),
+        ("skinstealer_leg_right", (-2.1, 15, 0), [
+            elem(6.5, -7.0, 6.5, 9.5, 8.0, 9.5, SS_SKIN),
+            elem(6.7, -7.2, 6.0, 9.3, -4.5, 7.2, SS_GORE),
+        ]),
+    ]
+
     for tex_key, bones in (
         ("minecraft:item/entity_bacteria", bacteria_bones),
         ("minecraft:item/entity_smiler", smiler_bones),
         ("minecraft:item/entity_hound", hound_bones),
+        ("minecraft:item/entity_faceless", faceless_bones),
+        ("minecraft:item/entity_skinstealer", skinstealer_bones),
     ):
         for bone_name, _, els in bones:
             write_json(os.path.join(item_model_dir, f"{bone_name}.json"), build_bone_model(tex_key, els))
@@ -512,4 +664,7 @@ def generate_blockbench_entities(pack_dir, blockbench_src_dir):
     export_bbmodel(os.path.join(blockbench_src_dir, "bacteria.bbmodel"), "bacteria", "entity_bacteria.png", bac_png, bacteria_bones)
     export_bbmodel(os.path.join(blockbench_src_dir, "smiler.bbmodel"), "smiler", "entity_smiler.png", smiler_png, smiler_bones)
     export_bbmodel(os.path.join(blockbench_src_dir, "hound.bbmodel"), "hound", "entity_hound.png", hound_png, hound_bones)
-    print(f"Generated 3 Blockbench projects + {len(bacteria_bones)+len(smiler_bones)+len(hound_bones)} JSON bone models.")
+    export_bbmodel(os.path.join(blockbench_src_dir, "faceless.bbmodel"), "faceless", "entity_faceless.png", faceless_png, faceless_bones)
+    export_bbmodel(os.path.join(blockbench_src_dir, "skinstealer.bbmodel"), "skinstealer", "entity_skinstealer.png", skin_png, skinstealer_bones)
+    total_bones = len(bacteria_bones) + len(smiler_bones) + len(hound_bones) + len(faceless_bones) + len(skinstealer_bones)
+    print(f"Generated 5 Blockbench projects + {total_bones} JSON bone models.")

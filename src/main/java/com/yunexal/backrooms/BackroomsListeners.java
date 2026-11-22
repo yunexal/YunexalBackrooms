@@ -9,6 +9,7 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
@@ -16,6 +17,7 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Barrel;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Candle;
 import org.bukkit.block.data.type.Light;
 import org.bukkit.entity.Player;
@@ -43,7 +45,11 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -57,6 +63,7 @@ public final class BackroomsListeners implements Listener {
     private final YunexalBackroomsPlugin plugin;
     private final NamespacedKey manilaStockedKey;
     private final NamespacedKey manilaOpenedKey;
+    private final NamespacedKey level1CrateKey;
 
     private final Map<UUID, Long> lastHumAtMs = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastFlickerAtMs = new ConcurrentHashMap<>();
@@ -64,8 +71,12 @@ public final class BackroomsListeners implements Listener {
     private final Map<UUID, Long> lastInteractAtMs = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastAnomalyAtMs = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastNoclipAtMs = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastExitTransitionAtMs = new ConcurrentHashMap<>();
     private final Map<UUID, Long> playerCellKey = new ConcurrentHashMap<>();
     private final Map<UUID, Location> activeFlashlightLoc = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<BlockKey>> activeFlickerWalls = new ConcurrentHashMap<>();
+    private final Map<BlockKey, Long> activeExitRifts = new ConcurrentHashMap<>();
+    private final Map<UUID, String> lastDeathWorld = new ConcurrentHashMap<>();
     private final Map<BlockKey, Integer> ventHitProgress = new ConcurrentHashMap<>();
 
     private BukkitTask ambientTask;
@@ -78,6 +89,7 @@ public final class BackroomsListeners implements Listener {
         this.plugin = plugin;
         this.manilaStockedKey = new NamespacedKey(plugin, "manila_stocked");
         this.manilaOpenedKey = new NamespacedKey(plugin, "manila_opened");
+        this.level1CrateKey = new NamespacedKey(plugin, "level1_crate");
     }
 
     public void start() {
@@ -102,20 +114,25 @@ public final class BackroomsListeners implements Listener {
         }
         for (Player p : Bukkit.getOnlinePlayers()) {
             restoreFlashlight(p);
+            restoreFlickerWalls(p);
         }
         activeFlashlightLoc.clear();
+        activeFlickerWalls.clear();
+        activeExitRifts.clear();
         lastHumAtMs.clear();
         lastFlickerAtMs.clear();
         lastRedPulseAtMs.clear();
         lastInteractAtMs.clear();
         lastAnomalyAtMs.clear();
         lastNoclipAtMs.clear();
+        lastExitTransitionAtMs.clear();
         playerCellKey.clear();
         ventHitProgress.clear();
     }
 
     public void clearPlayerState(Player player) {
         restoreFlashlight(player);
+        restoreFlickerWalls(player);
         UUID uid = player.getUniqueId();
         lastHumAtMs.remove(uid);
         lastFlickerAtMs.remove(uid);
@@ -123,6 +140,7 @@ public final class BackroomsListeners implements Listener {
         lastInteractAtMs.remove(uid);
         lastAnomalyAtMs.remove(uid);
         lastNoclipAtMs.remove(uid);
+        lastExitTransitionAtMs.remove(uid);
         playerCellKey.remove(uid);
     }
 
@@ -138,17 +156,53 @@ public final class BackroomsListeners implements Listener {
         long flickerCooldownMs = cfg.getFlickerCooldownSeconds() * 1000L;
         int ceilingY = cfg.getCeilingY();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
+        World level1 = plugin.getLevel1World();
+
+        // Seal expired Flickering Exit Wall breaches back into solid Level 0 walls
+        Iterator<Map.Entry<BlockKey, Long>> riftIt = activeExitRifts.entrySet().iterator();
+        while (riftIt.hasNext()) {
+            Map.Entry<BlockKey, Long> entry = riftIt.next();
+            if (now >= entry.getValue()) {
+                BlockKey k = entry.getKey();
+                World rw = Bukkit.getWorld(k.worldId());
+                if (rw != null && rw.isChunkLoaded(k.x() >> 4, k.z() >> 4)) {
+                    Block b = rw.getBlockAt(k.x(), k.y(), k.z());
+                    if (b.getType().isAir()) {
+                        b.setType(k.y() == cfg.getFloorY() + 1 ? Material.ORANGE_TERRACOTTA : Material.YELLOW_TERRACOTTA, false);
+                    }
+                }
+                riftIt.remove();
+            }
+        }
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (!player.getWorld().equals(level0)) {
-                continue;
-            }
-            if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
+            World pw = player.getWorld();
+            boolean inL0 = pw.equals(level0);
+            boolean inL1 = level1 != null && pw.equals(level1);
+            if ((!inL0 && !inL1)
+                    || plugin.getLimboManager().isInLimbo(player)
+                    || !plugin.getLimboManager().isVerified(player)) {
                 continue;
             }
 
             UUID uid = player.getUniqueId();
             Location loc = player.getLocation();
+
+            if (inL1) {
+                long prevHum = lastHumAtMs.getOrDefault(uid, 0L);
+                if (now - prevHum >= humIntervalMs) {
+                    lastHumAtMs.put(uid, now);
+                    boolean blackout = plugin.getLevel1Manager() != null
+                            && plugin.getLevel1Manager().getBlackoutPhase() == Level1Manager.BlackoutPhase.BLACKOUT;
+                    if (!blackout) {
+                        player.playSound(player, "minecraft:backrooms.ambient.hum", SoundCategory.AMBIENT, 0.10f, 0.88f);
+                    }
+                }
+                continue;
+            }
+
+            plugin.getPlayerData().addSurvivalSecondsLevel0(player, 1);
+
             int floorY = cfg.getFloorY();
             GameMode gm = player.getGameMode();
             boolean survivalOrAdventure = (gm == GameMode.SURVIVAL || gm == GameMode.ADVENTURE);
@@ -244,13 +298,24 @@ public final class BackroomsListeners implements Listener {
             return;
         }
         BackroomsItems items = plugin.getItems();
+        int tickMod = Bukkit.getCurrentTick() & 7;
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (!player.getWorld().equals(level0)
+            World pw = player.getWorld();
+            if (!plugin.isBackroomsGameplayWorld(pw)
                     || plugin.getLimboManager().isInLimbo(player)
                     || !plugin.getLimboManager().isVerified(player)) {
                 restoreFlashlight(player);
+                restoreFlickerWalls(player);
                 continue;
+            }
+
+            if (pw.equals(level0)) {
+                if ((tickMod & 1) == 0) {
+                    tickFlickerExitWalls(player, level0);
+                }
+            } else {
+                restoreFlickerWalls(player);
             }
 
             boolean holdingLight = items.isItem(player.getInventory().getItemInMainHand(), BackroomsItems.ID_FLASHLIGHT)
@@ -279,6 +344,91 @@ public final class BackroomsListeners implements Listener {
             lightData.setLevel(12);
             player.sendBlockChange(target, lightData);
             activeFlashlightLoc.put(player.getUniqueId(), target);
+        }
+    }
+
+    private void tickFlickerExitWalls(Player player, World level0) {
+        BackroomsConfig cfg = plugin.getBackroomsConfig();
+        Level0ChunkGenerator gen = plugin.getLevel0Generator();
+        Location loc = player.getLocation();
+        int px = loc.getBlockX();
+        int pz = loc.getBlockZ();
+        int floorY = cfg.getFloorY();
+        int ceilingY = cfg.getCeilingY();
+
+        Set<BlockKey> prev = activeFlickerWalls.computeIfAbsent(player.getUniqueId(), ignored -> ConcurrentHashMap.newKeySet());
+        Set<BlockKey> next = new HashSet<>();
+        ThreadLocalRandom rng = ThreadLocalRandom.current();
+
+        int minCx = Math.floorDiv(px - 16, Level0ChunkGenerator.CELL_SIZE);
+        int maxCx = Math.floorDiv(px + 16, Level0ChunkGenerator.CELL_SIZE);
+        int minCz = Math.floorDiv(pz - 16, Level0ChunkGenerator.CELL_SIZE);
+        int maxCz = Math.floorDiv(pz + 16, Level0ChunkGenerator.CELL_SIZE);
+
+        BlockData concreteBleed = Material.GRAY_TERRACOTTA.createBlockData();
+        BlockData staticFlash = Material.OCHRE_FROGLIGHT.createBlockData();
+
+        for (int cx = minCx; cx <= maxCx; cx++) {
+            for (int cz = minCz; cz <= maxCz; cz++) {
+                for (boolean north : new boolean[]{true, false}) {
+                    int bxBase = north ? cx * 4 + 2 : cx * 4;
+                    int bzBase = north ? cz * 4 : cz * 4 + 2;
+                    if (!gen.isFlickeringExitBlock(level0, bxBase, floorY + 2, bzBase)) {
+                        continue;
+                    }
+                    double flickerPhase = rng.nextDouble();
+                    boolean playSpark = flickerPhase < 0.36;
+                    BlockData overrideData = (flickerPhase < 0.22) ? concreteBleed : (flickerPhase < 0.34 ? staticFlash : null);
+
+                    for (int i = 0; i < 2; i++) {
+                        int bx = north ? bxBase + i : bxBase;
+                        int bz = north ? bzBase : bzBase + i;
+                        for (int y = floorY + 1; y < ceilingY; y++) {
+                            Block real = level0.getBlockAt(bx, y, bz);
+                            if (real.getType().isAir()) {
+                                continue;
+                            }
+                            BlockKey key = new BlockKey(level0.getUID(), bx, y, bz);
+                            next.add(key);
+                            if (overrideData != null) {
+                                player.sendBlockChange(real.getLocation(), overrideData);
+                            } else {
+                                player.sendBlockChange(real.getLocation(), real.getBlockData());
+                            }
+                        }
+                    }
+                    if (playSpark && loc.distanceSquared(new Location(level0, bxBase + 0.5, floorY + 2.0, bzBase + 0.5)) <= 12.0 * 12.0) {
+                        player.spawnParticle(Particle.ELECTRIC_SPARK, bxBase + 0.5, floorY + 2.2, bzBase + 0.5, 2, 0.35, 0.45, 0.35, 0.01);
+                        if (rng.nextDouble() < 0.14) {
+                            player.playSound(new Location(level0, bxBase + 0.5, floorY + 2.0, bzBase + 0.5),
+                                    "minecraft:backrooms.fx.radio_static", SoundCategory.BLOCKS, 0.28f, 0.85f + rng.nextFloat() * 0.3f);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (BlockKey stale : prev) {
+            if (!next.contains(stale)) {
+                Block real = level0.getBlockAt(stale.x(), stale.y(), stale.z());
+                player.sendBlockChange(real.getLocation(), real.getBlockData());
+            }
+        }
+        prev.clear();
+        prev.addAll(next);
+    }
+
+    private void restoreFlickerWalls(Player player) {
+        Set<BlockKey> prev = activeFlickerWalls.remove(player.getUniqueId());
+        if (prev == null || prev.isEmpty() || !player.isOnline()) {
+            return;
+        }
+        for (BlockKey k : prev) {
+            World w = Bukkit.getWorld(k.worldId());
+            if (w != null && w.isChunkLoaded(k.x() >> 4, k.z() >> 4)) {
+                Block real = w.getBlockAt(k.x(), k.y(), k.z());
+                player.sendBlockChange(real.getLocation(), real.getBlockData());
+            }
         }
     }
 
@@ -313,6 +463,15 @@ public final class BackroomsListeners implements Listener {
 
         Location to = event.getTo();
         Location from = event.getFrom();
+        BlockKey feetKey = new BlockKey(level0.getUID(), to.getBlockX(), to.getBlockY(), to.getBlockZ());
+        if (activeExitRifts.containsKey(feetKey)) {
+            long nowExit = System.currentTimeMillis();
+            if (nowExit - lastExitTransitionAtMs.getOrDefault(player.getUniqueId(), 0L) >= 4000L) {
+                lastExitTransitionAtMs.put(player.getUniqueId(), nowExit);
+                Bukkit.getScheduler().runTask(plugin, () -> transitionToLevel1(player));
+                return;
+            }
+        }
         BackroomsConfig cfg = plugin.getBackroomsConfig();
         int floorY = cfg.getFloorY();
         GameMode gm = player.getGameMode();
@@ -379,16 +538,49 @@ public final class BackroomsListeners implements Listener {
 
     private void triggerSoftCarpetNoclip(Player player, World level0) {
         restoreFlashlight(player);
+        restoreFlickerWalls(player);
         player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.65f, 1.0f);
         player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 36, 0, false, false, false));
         player.showTitle(Title.title(
-                Component.text("МЕЖА РІВНЯ 1", NamedTextColor.GRAY, TextDecoration.BOLD),
-                Component.text("«Житлова зона» у розробці — вас відкинуло назад у Лобі", NamedTextColor.DARK_GRAY),
+                Component.text("НОУКЛІП", NamedTextColor.GRAY, TextDecoration.BOLD),
+                Component.text("М'який килим провалив вас у інший сектор Лобі", NamedTextColor.DARK_GRAY),
                 Title.Times.times(Duration.ofMillis(200), Duration.ofSeconds(3), Duration.ofMillis(700))
         ));
         Location nextSpot = plugin.getLevel0Generator().findRandomFarSpawn(
                 level0, Bukkit.getOnlinePlayers(), plugin.getBackroomsConfig().getSpawnRadius());
         player.teleport(nextSpot);
+    }
+
+    public void transitionToLevel1(Player player) {
+        World level1 = plugin.getLevel1World();
+        if (level1 == null || !player.isOnline()) {
+            return;
+        }
+        restoreFlashlight(player);
+        restoreFlickerWalls(player);
+        player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.75f, 0.92f);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 42, 0, false, false, false));
+        Location arrival = plugin.getLevel1Generator().getArrivalLocation(level1);
+        player.teleport(arrival);
+        plugin.getPlayerData().savePlayer(player);
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            player.playSound(player, "minecraft:backrooms.fx.blackout_breaker", SoundCategory.AMBIENT, 0.45f, 1.05f);
+            player.showTitle(Title.title(
+                    Component.text("РІВЕНЬ 1", NamedTextColor.GRAY, TextDecoration.BOLD),
+                    Component.text("«Населена зона» // Ви вирвалися до залишків людства", NamedTextColor.WHITE),
+                    Title.Times.times(Duration.ofMillis(250), Duration.ofSeconds(4), Duration.ofMillis(800))
+            ));
+            player.sendMessage(Component.text("▸ ", NamedTextColor.AQUA)
+                    .append(Component.text("Ви прорвалися крізь блимаючу стіну на ", NamedTextColor.GRAY))
+                    .append(Component.text("Рівень 1 «Населена зона»", NamedTextColor.WHITE))
+                    .append(Component.text(". Попереду — вогні ", NamedTextColor.GRAY))
+                    .append(Component.text("Бази Альфа [M.E.G.]", NamedTextColor.AQUA))
+                    .append(Component.text(". Шукайте ящики з припасами та остерігайтеся «Мерехтіння»!", NamedTextColor.GRAY)));
+        }, 10L);
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -397,10 +589,12 @@ public final class BackroomsListeners implements Listener {
             return;
         }
         Player player = event.getPlayer();
-        World level0 = plugin.getLevel0World();
-        if (level0 == null || !player.getWorld().equals(level0)) {
+        World pw = player.getWorld();
+        if (!plugin.isBackroomsGameplayWorld(pw)) {
             return;
         }
+        World level0 = plugin.getLevel0World();
+        World level1 = plugin.getLevel1World();
         if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
             return;
         }
@@ -411,24 +605,32 @@ public final class BackroomsListeners implements Listener {
         Action action = event.getAction();
         Block clicked = event.getClickedBlock();
 
-        // Allow native container/station usage cleanly, ensuring Manila barrel always has loot
+        // Allow native container/station usage cleanly, ensuring Manila/Level 1 barrels always have loot if unstocked
         if (action == Action.RIGHT_CLICK_BLOCK && clicked != null) {
-            if (clicked.getType() == Material.CRAFTING_TABLE) {
+            if (clicked.getType() == Material.CRAFTING_TABLE || clicked.getType() == Material.FURNACE || clicked.getType() == Material.SMOKER) {
                 return;
             }
             if (clicked.getType() == Material.BARREL) {
-                if (clicked.getState() instanceof Barrel barrel
-                        && plugin.getLevel0Generator().getZoneAtBlock(level0, clicked.getX(), clicked.getZ())
-                        == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
+                if (clicked.getState() instanceof Barrel barrel) {
                     var pdc = barrel.getPersistentDataContainer();
-                    if (!pdc.has(manilaStockedKey, PersistentDataType.BYTE)
-                            || (!pdc.has(manilaOpenedKey, PersistentDataType.BYTE) && barrel.getInventory().isEmpty())) {
-                        Level0Populator.fillManilaBarrelLoot(barrel.getInventory(), barrel, ThreadLocalRandom.current(), items, manilaStockedKey);
-                        pdc.set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
-                        barrel.update(true, false);
-                    } else if (!pdc.has(manilaOpenedKey, PersistentDataType.BYTE)) {
-                        pdc.set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
-                        barrel.update(true, false);
+                    if (level0 != null && pw.equals(level0)
+                            && plugin.getLevel0Generator().getZoneAtBlock(level0, clicked.getX(), clicked.getZ())
+                            == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
+                        if (!pdc.has(manilaStockedKey, PersistentDataType.BYTE)
+                                || (!pdc.has(manilaOpenedKey, PersistentDataType.BYTE) && barrel.getInventory().isEmpty())) {
+                            Level0Populator.fillManilaBarrelLoot(barrel.getInventory(), barrel, ThreadLocalRandom.current(), items, manilaStockedKey);
+                            pdc.set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
+                            barrel.update(true, false);
+                        } else if (!pdc.has(manilaOpenedKey, PersistentDataType.BYTE)) {
+                            pdc.set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
+                            barrel.update(true, false);
+                        }
+                    } else if (level1 != null && pw.equals(level1)) {
+                        if (!pdc.has(manilaOpenedKey, PersistentDataType.BYTE) && !pdc.has(level1CrateKey, PersistentDataType.BYTE)) {
+                            Level1Populator.fillLevel1CrateLoot(barrel.getInventory(), barrel, ThreadLocalRandom.current(), items, level1CrateKey);
+                            pdc.set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
+                            barrel.update(true, false);
+                        }
                     }
                 }
                 return;
@@ -445,6 +647,25 @@ public final class BackroomsListeners implements Listener {
             if (BackroomsItems.ID_BANDAGE.equals(heldId)) {
                 event.setCancelled(true);
                 applyBandage(player, held);
+                return;
+            }
+            if (BackroomsItems.ID_BATTERY.equals(heldId)) {
+                event.setCancelled(true);
+                consumeOne(player, held);
+                player.removePotionEffect(PotionEffectType.DARKNESS);
+                if (plugin.getHallucinations() != null) {
+                    plugin.getHallucinations().reduceFatigue(player, 0.25);
+                }
+                player.playSound(player, Sound.BLOCK_BEACON_ACTIVATE, SoundCategory.PLAYERS, 0.45f, 1.8f);
+                player.sendActionBar(Component.text("Лужна батарейка: ліхтар підживлено, темрява відступила!", NamedTextColor.AQUA));
+                return;
+            }
+            if (BackroomsItems.ID_USED_SYRINGE.equals(heldId)) {
+                event.setCancelled(true);
+                consumeOne(player, held);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 80, 0, false, false, false));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.NAUSEA, 100, 0, false, false, false));
+                player.sendActionBar(Component.text("Ви поранилися брудним шприцом з ящика!", NamedTextColor.RED));
                 return;
             }
             if (BackroomsItems.ID_DAMP_WALLPAPER.equals(heldId)) {
@@ -467,6 +688,21 @@ public final class BackroomsListeners implements Listener {
                     return;
                 }
             }
+        }
+
+        // Level 0 Flickering Exit Wall feedback on right-click
+        if (clicked != null && level0 != null && pw.equals(level0) && action == Action.RIGHT_CLICK_BLOCK
+                && plugin.getLevel0Generator().isFlickeringExitBlock(level0, clicked.getX(), clicked.getY(), clicked.getZ())) {
+            int survived = plugin.getPlayerData().getSurvivalSecondsLevel0(player);
+            int minSec = plugin.getBackroomsConfig().getExitMinSurvivalSeconds();
+            if (survived >= minSec || player.hasPermission("yunexal.backrooms.admin")) {
+                player.sendActionBar(Component.text("БЛИМАЮЧА СТІНА! Проломіть її (ЛКМ), щоб вирватися на Рівень 1!", NamedTextColor.AQUA));
+            } else {
+                int rem = Math.max(1, minSec - survived);
+                player.sendActionBar(Component.text("Стіна блимає, та простір ще тримає вас! Виживіть ще "
+                        + (rem / 60) + ":" + String.format("%02d", rem % 60), NamedTextColor.YELLOW));
+            }
+            return;
         }
 
         // Dead 1980s North American electrical wall outlet (non-functional on Level 0)
@@ -706,21 +942,70 @@ public final class BackroomsListeners implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
+        if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
+            if (!player.hasPermission("yunexal.backrooms.admin")) {
+                event.setCancelled(true);
+            }
+            return;
+        }
+        Block block = event.getBlock();
+        World bw = block.getWorld();
+        World level0 = plugin.getLevel0World();
+        World level1 = plugin.getLevel1World();
+        if (!plugin.isBackroomsGameplayWorld(bw)) {
+            if (!player.hasPermission("yunexal.backrooms.admin")) {
+                event.setCancelled(true);
+            }
+            return;
+        }
+
+        // Level 0 Flickering Exit Wall breakthrough -> tears open doorway into Level 1!
+        BackroomsConfig cfg = plugin.getBackroomsConfig();
+        if (level0 != null && bw.equals(level0)
+                && plugin.getLevel0Generator().isFlickeringExitBlock(level0, block.getX(), block.getY(), block.getZ())) {
+            int survived = plugin.getPlayerData().getSurvivalSecondsLevel0(player);
+            int minSec = cfg.getExitMinSurvivalSeconds();
+            if (!player.hasPermission("yunexal.backrooms.admin") && survived < minSec) {
+                event.setCancelled(true);
+                int rem = Math.max(1, minSec - survived);
+                player.playSound(block.getLocation().add(0.5, 0.5, 0.5), "minecraft:backrooms.fx.radio_static", SoundCategory.BLOCKS, 0.5f, 1.0f);
+                player.spawnParticle(Particle.ELECTRIC_SPARK, block.getLocation().add(0.5, 0.5, 0.5), 10, 0.35, 0.35, 0.35, 0.03);
+                player.sendActionBar(Component.text("Блимаюча стіна не піддається! Виживіть ще "
+                        + (rem / 60) + ":" + String.format("%02d", rem % 60), NamedTextColor.YELLOW));
+                return;
+            }
+            event.setCancelled(true);
+            Location[] bounds = plugin.getLevel0Generator().getFlickeringExitBounds(level0, block.getX(), block.getZ());
+            long expiresAt = System.currentTimeMillis() + 45_000L;
+            for (int x = bounds[0].getBlockX(); x <= bounds[1].getBlockX(); x++) {
+                for (int z = bounds[0].getBlockZ(); z <= bounds[1].getBlockZ(); z++) {
+                    for (int y = cfg.getFloorY() + 1; y < cfg.getCeilingY(); y++) {
+                        Block b = level0.getBlockAt(x, y, z);
+                        b.setType(Material.AIR, false);
+                        activeExitRifts.put(new BlockKey(level0.getUID(), x, y, z), expiresAt);
+                        level0.spawnParticle(Particle.PORTAL, x + 0.5, y + 0.5, z + 0.5, 14, 0.3, 0.3, 0.3, 0.1);
+                    }
+                }
+            }
+            if (level1 != null) {
+                lastExitTransitionAtMs.put(player.getUniqueId(), System.currentTimeMillis());
+                Bukkit.getScheduler().runTask(plugin, () -> transitionToLevel1(player));
+            }
+            return;
+        }
+
         if (player.hasPermission("yunexal.backrooms.admin")) {
             return;
         }
-        if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
+
+        boolean inL1 = (level1 != null && bw.equals(level1));
+        if (inL1 && plugin.getLevel1Generator().isInProtectedOutpostCore(level1, block.getX(), block.getZ())) {
             event.setCancelled(true);
+            player.sendActionBar(Component.text("Територія аванпосту людства захищена!", NamedTextColor.RED));
             return;
         }
-        World level0 = plugin.getLevel0World();
-        Block block = event.getBlock();
-        if (level0 == null || !block.getWorld().equals(level0)) {
-            event.setCancelled(true);
-            return;
-        }
-        BackroomsConfig cfg = plugin.getBackroomsConfig();
-        int ceilingY = cfg.getFloorY() + cfg.getWallHeight() + 1;
+
+        int ceilingY = inL1 ? cfg.getLevel1CeilingY() : cfg.getCeilingY();
         if (block.getType() == Material.BEDROCK || block.getY() >= ceilingY) {
             event.setCancelled(true);
             return;
@@ -781,15 +1066,23 @@ public final class BackroomsListeners implements Listener {
             event.setCancelled(true);
             return;
         }
-        World level0 = plugin.getLevel0World();
         Block block = event.getBlock();
-        if (level0 == null || !block.getWorld().equals(level0)) {
+        World bw = block.getWorld();
+        World level1 = plugin.getLevel1World();
+        if (!plugin.isBackroomsGameplayWorld(bw)) {
             event.setCancelled(true);
             return;
         }
         BackroomsConfig cfg = plugin.getBackroomsConfig();
-        int ceilingY = cfg.getFloorY() + cfg.getWallHeight() + 1;
-        if (block.getY() >= ceilingY || block.getY() < cfg.getFloorY() - 1) {
+        boolean inL1 = (level1 != null && bw.equals(level1));
+        if (inL1 && plugin.getLevel1Generator().isInProtectedOutpostCore(level1, block.getX(), block.getZ())) {
+            event.setCancelled(true);
+            player.sendActionBar(Component.text("Територія аванпосту людства захищена!", NamedTextColor.RED));
+            return;
+        }
+        int floorY = inL1 ? cfg.getLevel1FloorY() : cfg.getFloorY();
+        int ceilingY = inL1 ? cfg.getLevel1CeilingY() : cfg.getCeilingY();
+        if (block.getY() >= ceilingY || block.getY() < floorY - 1) {
             event.setCancelled(true);
             return;
         }
@@ -801,6 +1094,7 @@ public final class BackroomsListeners implements Listener {
         if (block.getType() == Material.BARREL && block.getState() instanceof Barrel barrel) {
             barrel.getPersistentDataContainer().set(manilaStockedKey, PersistentDataType.BYTE, (byte) 1);
             barrel.getPersistentDataContainer().set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
+            barrel.getPersistentDataContainer().set(level1CrateKey, PersistentDataType.BYTE, (byte) 1);
             barrel.update(true, false);
         }
     }
@@ -834,6 +1128,11 @@ public final class BackroomsListeners implements Listener {
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
         event.deathMessage(null);
+        Player p = event.getEntity();
+        lastDeathWorld.put(p.getUniqueId(), p.getWorld().getName());
+        if (p.getWorld().equals(plugin.getLevel0World())) {
+            plugin.getPlayerData().resetSurvivalSecondsLevel0(p);
+        }
     }
 
     @EventHandler
@@ -841,6 +1140,12 @@ public final class BackroomsListeners implements Listener {
         Player player = event.getPlayer();
         if (plugin.getLimboManager().isInLimbo(player)) {
             event.setRespawnLocation(plugin.getLimboManager().getLimboSpawnLocation());
+            return;
+        }
+        String deathWorldName = lastDeathWorld.remove(player.getUniqueId());
+        World level1 = plugin.getLevel1World();
+        if (level1 != null && level1.getName().equals(deathWorldName)) {
+            event.setRespawnLocation(plugin.getLevel1Generator().getArrivalLocation(level1));
             return;
         }
         World w = plugin.getLevel0World();

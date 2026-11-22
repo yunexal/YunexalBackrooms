@@ -294,6 +294,7 @@ public final class LimboManager implements Listener {
                     level0, Bukkit.getOnlinePlayers(), plugin.getBackroomsConfig().getSpawnRadius());
         }
         player.teleport(targetLoc);
+        boolean arrivedInLevel1 = targetLoc.getWorld() != null && targetLoc.getWorld().equals(plugin.getLevel1World());
 
         for (Player other : Bukkit.getOnlinePlayers()) {
             if (!other.equals(player) && !pendingJoinAtMs.containsKey(other.getUniqueId())) {
@@ -306,16 +307,24 @@ public final class LimboManager implements Listener {
             player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.65f, 1.0f);
         }
 
-        player.showTitle(Title.title(
-                Component.text("РІВЕНЬ 0", NamedTextColor.YELLOW, TextDecoration.BOLD),
-                Component.text("«Лобі» // Безкраї жовті коридори", NamedTextColor.GRAY),
-                Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(4), Duration.ofMillis(800))
-        ));
+        if (arrivedInLevel1) {
+            player.showTitle(Title.title(
+                    Component.text("РІВЕНЬ 1", NamedTextColor.GRAY, TextDecoration.BOLD),
+                    Component.text("«Населена зона» // Склади та аванпости", NamedTextColor.DARK_GRAY),
+                    Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(4), Duration.ofMillis(800))
+            ));
+        } else {
+            player.showTitle(Title.title(
+                    Component.text("РІВЕНЬ 0", NamedTextColor.YELLOW, TextDecoration.BOLD),
+                    Component.text("«Лобі» // Безкраї жовті коридори", NamedTextColor.GRAY),
+                    Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(4), Duration.ofMillis(800))
+            ));
+        }
         if (firstEntry) {
             player.sendMessage(Component.text("▸ ", NamedTextColor.YELLOW)
                     .append(Component.text("Ви провалилися у ", NamedTextColor.GRAY))
                     .append(Component.text("Рівень 0 «Лобі» (Виживання)", NamedTextColor.GOLD))
-                    .append(Component.text(". Здирайте ковролін і шпалери, облаштовуйте базу — інші побачать ваші сліди. Крафти: ", NamedTextColor.GRAY))
+                    .append(Component.text(". Здирайте ковролін і шпалери, облаштовуйте базу, а виживши достатньо довго — знайдіть блимаючу стіну до Рівня 1. Крафти: ", NamedTextColor.GRAY))
                     .append(Component.text("/br craft", NamedTextColor.YELLOW))
                     .append(Component.text(" | Хаб: ", NamedTextColor.GRAY))
                     .append(Component.text("/br hub", NamedTextColor.AQUA)));

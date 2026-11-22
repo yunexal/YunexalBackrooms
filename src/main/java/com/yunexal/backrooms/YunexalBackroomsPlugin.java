@@ -16,8 +16,10 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
     private PlayerDataManager playerData;
     private CraftingManager craftingManager;
     private Level0ChunkGenerator level0Generator;
+    private Level1ChunkGenerator level1Generator;
     private VoidChunkGenerator voidGenerator;
     private LimboManager limboManager;
+    private Level1Manager level1Manager;
     private BackroomsListeners listeners;
     private HallucinationManager hallucinations;
     private BodycamManager bodycam;
@@ -45,6 +47,7 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         this.craftingManager = new CraftingManager(this, items);
         this.craftingManager.registerRecipes();
         this.limboManager = new LimboManager(this);
+        this.level1Manager = new Level1Manager(this);
         this.listeners = new BackroomsListeners(this);
         this.hallucinations = new HallucinationManager(this);
         this.bodycam = new BodycamManager(this);
@@ -52,6 +55,7 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(craftingManager, this);
         getServer().getPluginManager().registerEvents(limboManager, this);
+        getServer().getPluginManager().registerEvents(level1Manager, this);
         getServer().getPluginManager().registerEvents(listeners, this);
         getServer().getPluginManager().registerEvents(entities, this);
 
@@ -65,13 +69,15 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         Bukkit.getScheduler().runTask(this, () -> {
             configureLevel0WorldRules();
             this.limboManager.init();
+            this.level1Manager.start();
             this.listeners.start();
             this.hallucinations.start();
             this.bodycam.start();
             this.entities.start();
             registerVoiceChatHook();
             getLogger().info("YunexalBackrooms worlds ready: Level 0='"
-                    + backroomsConfig.getLevel0WorldName() + "', Limbo='"
+                    + backroomsConfig.getLevel0WorldName() + "', Level 1='"
+                    + backroomsConfig.getLevel1WorldName() + "', Limbo='"
                     + backroomsConfig.getLimboWorldName() + "', Border="
                     + (int) backroomsConfig.getWorldBorderSize()
                     + ", View/Sim=" + backroomsConfig.getViewDistance() + "/" + backroomsConfig.getSimulationDistance());
@@ -104,6 +110,9 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         if (limboManager != null) {
             limboManager.shutdown();
         }
+        if (level1Manager != null) {
+            level1Manager.shutdown();
+        }
         getServer().getMessenger().unregisterOutgoingPluginChannel(this, "BungeeCord");
     }
 
@@ -130,6 +139,11 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         } else {
             this.level0Generator.clearCache();
         }
+        if (this.level1Generator == null) {
+            this.level1Generator = new Level1ChunkGenerator(this);
+        } else {
+            this.level1Generator.clearCache();
+        }
         this.voidGenerator = new VoidChunkGenerator(this.backroomsConfig);
         if (Bukkit.getServer() != null) {
             configureLevel0WorldRules();
@@ -151,7 +165,7 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         w.setGameRule(GameRules.SPAWN_MOBS, false);
         w.setGameRule(GameRules.SHOW_ADVANCEMENT_MESSAGES, false);
         w.setGameRule(GameRules.SHOW_DEATH_MESSAGES, false);
-        w.setGameRule(GameRules.KEEP_INVENTORY, true);
+        w.setGameRule(GameRules.KEEP_INVENTORY, false);
         w.setGameRule(GameRules.LOCATOR_BAR, false);
         w.setGameRule(GameRules.REDUCED_DEBUG_INFO, true);
         w.setViewDistance(backroomsConfig.getViewDistance());
@@ -172,6 +186,10 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         if (worldName.equalsIgnoreCase(backroomsConfig.getLimboWorldName())
                 || (id != null && id.equalsIgnoreCase("limbo"))) {
             return voidGenerator;
+        }
+        if (worldName.equalsIgnoreCase(backroomsConfig.getLevel1WorldName())
+                || (id != null && id.equalsIgnoreCase("level1"))) {
+            return level1Generator;
         }
         return level0Generator;
     }
@@ -194,6 +212,14 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
 
     public Level0ChunkGenerator getLevel0Generator() {
         return level0Generator;
+    }
+
+    public Level1ChunkGenerator getLevel1Generator() {
+        return level1Generator;
+    }
+
+    public Level1Manager getLevel1Manager() {
+        return level1Manager;
     }
 
     public VoidChunkGenerator getVoidGenerator() {
@@ -222,5 +248,16 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
 
     public @Nullable World getLevel0World() {
         return Bukkit.getWorld(backroomsConfig.getLevel0WorldName());
+    }
+
+    public @Nullable World getLevel1World() {
+        return level1Manager != null ? level1Manager.getLevel1World() : Bukkit.getWorld(backroomsConfig.getLevel1WorldName());
+    }
+
+    public boolean isBackroomsGameplayWorld(@Nullable World world) {
+        if (world == null) {
+            return false;
+        }
+        return world.equals(getLevel0World()) || world.equals(getLevel1World());
     }
 }

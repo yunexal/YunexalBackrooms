@@ -196,8 +196,11 @@ public final class HallucinationManager {
         ThreadLocalRandom rng = ThreadLocalRandom.current();
 
         // Update fatigue & trigger individual psychological hallucinations
+        World level1 = plugin.getLevel1World();
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (!player.getWorld().equals(level0)
+            boolean inL0 = player.getWorld().equals(level0);
+            boolean inL1 = level1 != null && player.getWorld().equals(level1);
+            if ((!inL0 && !inL1)
                     || plugin.getLimboManager().isInLimbo(player)
                     || !plugin.getLimboManager().isVerified(player)) {
                 continue;
@@ -205,23 +208,36 @@ public final class HallucinationManager {
 
             UUID uid = player.getUniqueId();
             Location loc = player.getLocation();
-            Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator()
-                    .getZoneAtBlock(level0, loc.getBlockX(), loc.getBlockZ());
-
-            boolean calm = now < almondCalmUntilMs.getOrDefault(uid, 0L);
-            if (!calm) {
-                double delta = switch (zone) {
-                    case MANILA_ROOM -> -0.012;
-                    case RED_ROOM -> +0.008;
-                    case BLACKOUT_ZONE -> +0.004;
-                    default -> +0.0018;
-                };
-                double next = Math.max(0.0, Math.min(1.0, fatigueMap.getOrDefault(uid, 0.0) + delta));
-                fatigueMap.put(uid, next);
+            boolean inSafeSanctuary;
+            if (inL0) {
+                Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator()
+                        .getZoneAtBlock(level0, loc.getBlockX(), loc.getBlockZ());
+                inSafeSanctuary = (zone == Level0ChunkGenerator.ZoneType.MANILA_ROOM);
+                if (now >= almondCalmUntilMs.getOrDefault(uid, 0L)) {
+                    double delta = switch (zone) {
+                        case MANILA_ROOM -> -0.012;
+                        case RED_ROOM -> +0.008;
+                        case BLACKOUT_ZONE -> +0.004;
+                        default -> +0.0018;
+                    };
+                    double next = Math.max(0.0, Math.min(1.0, fatigueMap.getOrDefault(uid, 0.0) + delta));
+                    fatigueMap.put(uid, next);
+                }
+            } else {
+                inSafeSanctuary = plugin.getLevel1Generator() != null
+                        && plugin.getLevel1Generator().isInProtectedOutpostCore(level1, loc.getBlockX(), loc.getBlockZ());
+                if (now >= almondCalmUntilMs.getOrDefault(uid, 0L)) {
+                    boolean blackout = plugin.getLevel1Manager() != null
+                            && plugin.getLevel1Manager().getBlackoutPhase() == Level1Manager.BlackoutPhase.BLACKOUT;
+                    double delta = inSafeSanctuary ? -0.015 : (blackout ? +0.0042 : +0.0005);
+                    double next = Math.max(0.0, Math.min(1.0, fatigueMap.getOrDefault(uid, 0.0) + delta));
+                    fatigueMap.put(uid, next);
+                }
             }
 
+            boolean calm = now < almondCalmUntilMs.getOrDefault(uid, 0L);
             double fatigue = fatigueMap.getOrDefault(uid, 0.0);
-            if (calm || zone == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
+            if (calm || inSafeSanctuary || !inL0) {
                 continue;
             }
 

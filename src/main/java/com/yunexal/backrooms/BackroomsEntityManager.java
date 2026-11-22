@@ -50,7 +50,9 @@ public final class BackroomsEntityManager implements Listener {
     public enum EntityKind {
         BACTERIA,
         SMILER,
-        HOUND
+        HOUND,
+        FACELESS,
+        SKIN_STEALER
     }
 
     private final YunexalBackroomsPlugin plugin;
@@ -87,6 +89,7 @@ public final class BackroomsEntityManager implements Listener {
         long nextStepAtMs;
         long chaseBurstUntilMs;
         long houndPauseUntilMs;
+        long provokedUntilMs;
         boolean stunned;
 
         TrackedEntity(EntityKind kind, Zombie host) {
@@ -114,6 +117,7 @@ public final class BackroomsEntityManager implements Listener {
     public void start() {
         shutdown();
         purgeOrphanParts(plugin.getLevel0World());
+        purgeOrphanParts(plugin.getLevel1World());
         aiTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickAI, 2L, 2L);
         startSpawnTimer();
     }
@@ -155,22 +159,32 @@ public final class BackroomsEntityManager implements Listener {
         }
         tracked.clear();
         purgeOrphanParts(plugin.getLevel0World());
+        purgeOrphanParts(plugin.getLevel1World());
         return removed;
+    }
+
+    public boolean isInSafeSanctuary(World w, int x, int z) {
+        if (w.equals(plugin.getLevel0World())) {
+            return plugin.getLevel0Generator().getZoneAtBlock(w, x, z) == Level0ChunkGenerator.ZoneType.MANILA_ROOM;
+        }
+        if (w.equals(plugin.getLevel1World())) {
+            return Level1ChunkGenerator.isOutpostZone(plugin.getLevel1Generator().getZoneAtBlock(w, x, z));
+        }
+        return true;
     }
 
     public boolean spawnEntity(Location loc, EntityKind kind) {
         BackroomsConfig cfg = plugin.getBackroomsConfig();
-        World level0 = plugin.getLevel0World();
-        if (!cfg.isEntitiesEnabled() || level0 == null || !loc.getWorld().equals(level0)) {
+        World w = loc.getWorld();
+        if (!cfg.isEntitiesEnabled() || w == null || !plugin.isBackroomsGameplayWorld(w)) {
             return false;
         }
 
-        if (plugin.getLevel0Generator().getZoneAtBlock(level0, loc.getBlockX(), loc.getBlockZ())
-                == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
+        if (isInSafeSanctuary(w, loc.getBlockX(), loc.getBlockZ())) {
             return false;
         }
 
-        Zombie host = level0.spawn(loc, Zombie.class, z -> {
+        Zombie host = w.spawn(loc, Zombie.class, z -> {
             z.setAdult();
             z.setInvisible(true);
             z.setSilent(true);
@@ -209,11 +223,27 @@ public final class BackroomsEntityManager implements Listener {
                     setAttr(z, Attribute.FOLLOW_RANGE, 26.0);
                     setAttr(z, Attribute.STEP_HEIGHT, 1.0);
                 }
+                case FACELESS -> {
+                    setAttr(z, Attribute.MAX_HEALTH, 24.0);
+                    z.setHealth(24.0);
+                    setAttr(z, Attribute.MOVEMENT_SPEED, 0.24);
+                    setAttr(z, Attribute.ATTACK_DAMAGE, 4.0);
+                    setAttr(z, Attribute.FOLLOW_RANGE, 22.0);
+                    setAttr(z, Attribute.STEP_HEIGHT, 1.0);
+                }
+                case SKIN_STEALER -> {
+                    setAttr(z, Attribute.MAX_HEALTH, 44.0);
+                    z.setHealth(44.0);
+                    setAttr(z, Attribute.MOVEMENT_SPEED, 0.30);
+                    setAttr(z, Attribute.ATTACK_DAMAGE, 6.0);
+                    setAttr(z, Attribute.FOLLOW_RANGE, 32.0);
+                    setAttr(z, Attribute.STEP_HEIGHT, 1.0);
+                }
             }
         });
 
         TrackedEntity te = new TrackedEntity(kind, host);
-        buildSkeletalRig(level0, loc, te);
+        buildSkeletalRig(w, loc, te);
         tracked.put(host.getUniqueId(), te);
         return true;
     }
@@ -244,6 +274,25 @@ public final class BackroomsEntityManager implements Listener {
                 addBone(w, loc, te, "leg_fr", "hound_leg_fr", -0.19f, -0.87f, +0.33f, s, false);
                 addBone(w, loc, te, "leg_bl", "hound_leg_bl", +0.18f, -0.90f, -0.35f, s, false);
                 addBone(w, loc, te, "leg_br", "hound_leg_br", -0.18f, -0.90f, -0.35f, s, false);
+            }
+            case FACELESS -> {
+                float s = 0.96f;
+                addBone(w, loc, te, "leg_left", "faceless_leg_left", +0.12f, -0.78f, 0.0f, s, false);
+                addBone(w, loc, te, "leg_right", "faceless_leg_right", -0.12f, -0.78f, 0.0f, s, false);
+                addBone(w, loc, te, "torso", "faceless_torso", 0.0f, -0.58f, 0.0f, s, false);
+                addBone(w, loc, te, "arm_left", "faceless_arm_left", +0.30f, -0.05f, 0.0f, s, false);
+                addBone(w, loc, te, "arm_right", "faceless_arm_right", -0.30f, -0.05f, 0.0f, s, false);
+                addBone(w, loc, te, "head", "faceless_head", 0.0f, +0.06f, 0.0f, s, false);
+            }
+            case SKIN_STEALER -> {
+                float s = 0.96f;
+                addBone(w, loc, te, "leg_left", "skinstealer_leg_left", +0.13f, -0.68f, 0.0f, s, false);
+                addBone(w, loc, te, "leg_right", "skinstealer_leg_right", -0.13f, -0.68f, 0.0f, s, false);
+                addBone(w, loc, te, "torso", "skinstealer_torso", 0.0f, -0.49f, 0.0f, s, false);
+                addBone(w, loc, te, "arm_left", "skinstealer_arm_left", +0.29f, +0.05f, 0.0f, s, false);
+                addBone(w, loc, te, "arm_right", "skinstealer_arm_right", -0.29f, +0.05f, 0.0f, s, false);
+                addBone(w, loc, te, "head", "skinstealer_head", 0.0f, +0.20f, +0.05f, s, false);
+                addBone(w, loc, te, "eyes", "skinstealer_eyes", 0.0f, +0.20f, +0.05f, s, true);
             }
         }
     }
@@ -294,8 +343,7 @@ public final class BackroomsEntityManager implements Listener {
     }
 
     private void tickAI() {
-        World level0 = plugin.getLevel0World();
-        if (level0 == null || tracked.isEmpty()) {
+        if (tracked.isEmpty()) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -312,9 +360,9 @@ public final class BackroomsEntityManager implements Listener {
             }
 
             Location mLoc = z.getLocation();
-            Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator()
-                    .getZoneAtBlock(level0, mLoc.getBlockX(), mLoc.getBlockZ());
-            if (zone == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
+            World w = mLoc.getWorld();
+            if (w == null || !plugin.isBackroomsGameplayWorld(w)
+                    || isInSafeSanctuary(w, mLoc.getBlockX(), mLoc.getBlockZ())) {
                 removeTracked(te);
                 it.remove();
                 continue;
@@ -323,7 +371,7 @@ public final class BackroomsEntityManager implements Listener {
             Player nearest = null;
             double nearestSq = Double.MAX_VALUE;
             for (Player p : Bukkit.getOnlinePlayers()) {
-                if (!p.getWorld().equals(level0) || plugin.getLimboManager().isInLimbo(p)
+                if (!p.getWorld().equals(w) || plugin.getLimboManager().isInLimbo(p)
                         || !plugin.getLimboManager().isVerified(p)) {
                     continue;
                 }
@@ -340,10 +388,13 @@ public final class BackroomsEntityManager implements Listener {
                 continue;
             }
 
-            Level0ChunkGenerator.ZoneType pZone = plugin.getLevel0Generator()
-                    .getZoneAtBlock(level0, nearest.getLocation().getBlockX(), nearest.getLocation().getBlockZ());
-            if (pZone == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
+            if (isInSafeSanctuary(w, nearest.getLocation().getBlockX(), nearest.getLocation().getBlockZ())) {
                 z.setTarget(null);
+            } else if (te.kind == EntityKind.FACELESS) {
+                boolean l1Blackout = w.equals(plugin.getLevel1World())
+                        && plugin.getLevel1Manager() != null
+                        && plugin.getLevel1Manager().getBlackoutPhase() == Level1Manager.BlackoutPhase.BLACKOUT;
+                z.setTarget((l1Blackout || now < te.provokedUntilMs) ? nearest : null);
             } else {
                 z.setTarget(nearest);
             }
@@ -354,6 +405,8 @@ public final class BackroomsEntityManager implements Listener {
                 case BACTERIA -> tickBacteria(te, z, nearest, mLoc, dist, los, now);
                 case SMILER -> tickSmiler(te, z, nearest, mLoc, dist, los, now);
                 case HOUND -> tickHound(te, z, nearest, mLoc, dist, los, now);
+                case FACELESS -> tickFaceless(te, z, nearest, mLoc, dist, los, now);
+                case SKIN_STEALER -> tickSkinStealer(te, z, nearest, mLoc, dist, los, now);
             }
             animateEntity(te, z, nearest, mLoc, now);
         }
@@ -409,6 +462,30 @@ public final class BackroomsEntityManager implements Listener {
                 animateBone(te.bones.get("leg_fr"), 0f, 0f, 0f, -stride, 0f, 0f);
                 animateBone(te.bones.get("leg_bl"), 0f, 0f, 0f, -stride, 0f, 0f);
             }
+            case FACELESS -> {
+                float stride = moving ? (float) Math.sin(ph) * 0.42f : 0.0f;
+                float bob = moving ? (float) Math.abs(Math.cos(ph)) * 0.03f : 0.0f;
+                float tilt = (float) Math.sin(ph * 0.4f) * 0.14f;
+                animateBone(te.bones.get("torso"), 0f, bob, 0f, 0f, 0f, 0f);
+                animateBone(te.bones.get("head"), 0f, bob, 0f, 0f, 0f, tilt);
+                animateBone(te.bones.get("arm_left"), 0f, bob, 0f, -stride * 0.7f, 0f, -0.05f);
+                animateBone(te.bones.get("arm_right"), 0f, bob, 0f, +stride * 0.7f, 0f, +0.05f);
+                animateBone(te.bones.get("leg_left"), 0f, 0f, 0f, +stride, 0f, 0f);
+                animateBone(te.bones.get("leg_right"), 0f, 0f, 0f, -stride, 0f, 0f);
+            }
+            case SKIN_STEALER -> {
+                boolean lunge = now < te.chaseBurstUntilMs;
+                float stride = moving ? (float) Math.sin(ph * 1.15f) * (lunge ? 0.62f : 0.45f) : 0.0f;
+                float bob = moving ? (float) Math.abs(Math.cos(ph * 1.15f)) * 0.045f : (float) Math.sin(ph) * 0.015f;
+                float snap = (float) Math.sin(ph * 2.2f) * (lunge ? 0.25f : 0.08f);
+                animateBone(te.bones.get("torso"), 0f, bob, 0f, moving ? 0.18f : 0.08f, 0f, snap * 0.25f);
+                animateBone(te.bones.get("head"), 0f, bob, 0f, -0.05f, 0f, snap);
+                animateBone(te.bones.get("eyes"), 0f, bob, 0f, -0.05f, 0f, snap);
+                animateBone(te.bones.get("arm_left"), 0f, bob, 0f, (lunge ? 0.65f : 0.28f) - stride * 0.8f, 0f, -0.10f);
+                animateBone(te.bones.get("arm_right"), 0f, bob, 0f, (lunge ? 0.65f : 0.28f) + stride * 0.8f, 0f, +0.10f);
+                animateBone(te.bones.get("leg_left"), 0f, 0f, 0f, +stride, 0f, 0f);
+                animateBone(te.bones.get("leg_right"), 0f, 0f, 0f, -stride, 0f, 0f);
+            }
         }
     }
 
@@ -459,47 +536,89 @@ public final class BackroomsEntityManager implements Listener {
         setAttr(z, Attribute.MOVEMENT_SPEED, now < te.houndPauseUntilMs ? 0.08 : 0.35);
     }
 
+    private void tickFaceless(TrackedEntity te, Zombie z, Player target, Location mLoc, double dist, boolean los, long now) {
+        boolean aggressive = z.getTarget() != null;
+        if (aggressive && los && dist <= 12.0 && now >= te.nextVocalAtMs) {
+            te.nextVocalAtMs = now + 6500L;
+            target.playSound(mLoc, "minecraft:backrooms.fx.whisper", SoundCategory.HOSTILE, 0.42f, 0.85f);
+        }
+        setAttr(z, Attribute.MOVEMENT_SPEED, aggressive ? 0.27 : 0.14);
+    }
+
+    private void tickSkinStealer(TrackedEntity te, Zombie z, Player target, Location mLoc, double dist, boolean los, long now) {
+        if (los && dist <= 18.0 && now >= te.nextVocalAtMs) {
+            te.nextVocalAtMs = now + 7000L;
+            te.chaseBurstUntilMs = now + 3000L;
+            target.playSound(mLoc, "minecraft:backrooms.entity.hound.growl", SoundCategory.HOSTILE, 0.55f, 0.72f);
+            target.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 55, 0, false, false, false));
+        }
+        setAttr(z, Attribute.MOVEMENT_SPEED, now < te.chaseBurstUntilMs ? 0.33 : 0.28);
+    }
+
     private void tickAutoSpawn() {
         BackroomsConfig cfg = plugin.getBackroomsConfig();
+        if (!cfg.isEntitiesEnabled() || getActiveCount() >= cfg.getEntitiesMaxGlobal()) {
+            return;
+        }
         World level0 = plugin.getLevel0World();
-        if (!cfg.isEntitiesEnabled() || !autoSpawnOverride || level0 == null) {
-            return;
-        }
-        if (getActiveCount() >= cfg.getEntitiesMaxGlobal()) {
-            return;
-        }
-
+        World level1 = plugin.getLevel1World();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
+
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (!player.getWorld().equals(level0)
+            World w = player.getWorld();
+            if (!plugin.isBackroomsGameplayWorld(w)
                     || plugin.getLimboManager().isInLimbo(player)
                     || !plugin.getLimboManager().isVerified(player)) {
                 continue;
             }
-            if (rng.nextDouble() >= cfg.getEntitiesAutoSpawnChance()) {
+            boolean inL0 = w.equals(level0);
+            boolean inL1 = level1 != null && w.equals(level1);
+            if (inL0 && !autoSpawnOverride) {
                 continue;
             }
-            Location pLoc = player.getLocation();
-            Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator()
-                    .getZoneAtBlock(level0, pLoc.getBlockX(), pLoc.getBlockZ());
-            if (zone == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
+            boolean l1Blackout = inL1 && plugin.getLevel1Manager() != null
+                    && plugin.getLevel1Manager().getBlackoutPhase() != Level1Manager.BlackoutPhase.LIT;
+            if (inL1 && (!cfg.isLevel1BlackoutEntitySpawns() || (!l1Blackout && rng.nextDouble() > 0.18))) {
+                continue;
+            }
+            if (inL0 && rng.nextDouble() >= cfg.getEntitiesAutoSpawnChance()) {
                 continue;
             }
 
-            Location spawnSpot = findSpawnSpotNear(level0, pLoc, cfg.getFloorY(), 18, 30);
+            Location pLoc = player.getLocation();
+            if (isInSafeSanctuary(w, pLoc.getBlockX(), pLoc.getBlockZ())) {
+                continue;
+            }
+
+            int floorY = inL1 ? cfg.getLevel1FloorY() : cfg.getFloorY();
+            Location spawnSpot = findSpawnSpotNear(w, pLoc, floorY, 18, 30);
             if (spawnSpot == null) {
                 continue;
             }
 
-            Level0ChunkGenerator.ZoneType sZone = plugin.getLevel0Generator()
-                    .getZoneAtBlock(level0, spawnSpot.getBlockX(), spawnSpot.getBlockZ());
             EntityKind kind;
-            if (sZone == Level0ChunkGenerator.ZoneType.BLACKOUT_ZONE || sZone == Level0ChunkGenerator.ZoneType.RED_ROOM) {
-                kind = rng.nextBoolean() ? EntityKind.SMILER : EntityKind.BACTERIA;
-            } else if (sZone == Level0ChunkGenerator.ZoneType.NARROW_MAZE) {
-                kind = EntityKind.HOUND;
+            if (inL1) {
+                if (l1Blackout) {
+                    int roll = rng.nextInt(4);
+                    kind = switch (roll) {
+                        case 0 -> EntityKind.SMILER;
+                        case 1 -> EntityKind.SKIN_STEALER;
+                        case 2 -> EntityKind.HOUND;
+                        default -> EntityKind.FACELESS;
+                    };
+                } else {
+                    kind = rng.nextDouble() < 0.72 ? EntityKind.FACELESS : EntityKind.HOUND;
+                }
             } else {
-                kind = rng.nextDouble() < 0.60 ? EntityKind.BACTERIA : EntityKind.HOUND;
+                Level0ChunkGenerator.ZoneType sZone = plugin.getLevel0Generator()
+                        .getZoneAtBlock(level0, spawnSpot.getBlockX(), spawnSpot.getBlockZ());
+                if (sZone == Level0ChunkGenerator.ZoneType.BLACKOUT_ZONE || sZone == Level0ChunkGenerator.ZoneType.RED_ROOM) {
+                    kind = rng.nextBoolean() ? EntityKind.SMILER : EntityKind.BACTERIA;
+                } else if (sZone == Level0ChunkGenerator.ZoneType.NARROW_MAZE) {
+                    kind = EntityKind.HOUND;
+                } else {
+                    kind = rng.nextDouble() < 0.60 ? EntityKind.BACTERIA : EntityKind.HOUND;
+                }
             }
             spawnEntity(spawnSpot, kind);
             break;
@@ -513,7 +632,7 @@ public final class BackroomsEntityManager implements Listener {
             double d = minDist + rng.nextDouble() * (maxDist - minDist);
             int x = (int) Math.floor(origin.getX() + Math.cos(ang) * d);
             int z = (int) Math.floor(origin.getZ() + Math.sin(ang) * d);
-            if (plugin.getLevel0Generator().getZoneAtBlock(w, x, z) == Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
+            if (isInSafeSanctuary(w, x, z)) {
                 continue;
             }
             Block floor = w.getBlockAt(x, floorY, z);
@@ -583,11 +702,15 @@ public final class BackroomsEntityManager implements Listener {
 
     @EventHandler
     public void onHit(EntityDamageByEntityEvent event) {
+        TrackedEntity attacked = tracked.get(event.getEntity().getUniqueId());
+        if (attacked != null && attacked.kind == EntityKind.FACELESS && event.getDamager() instanceof Player) {
+            attacked.provokedUntilMs = System.currentTimeMillis() + 30_000L;
+        }
         TrackedEntity te = tracked.get(event.getDamager().getUniqueId());
         if (te != null && event.getEntity() instanceof Player p) {
             if (te.kind == EntityKind.SMILER) {
                 p.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 40, 0, false, false, false));
-            } else if (te.kind == EntityKind.BACTERIA) {
+            } else if (te.kind == EntityKind.BACTERIA || te.kind == EntityKind.SKIN_STEALER) {
                 p.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 60, 0, false, false, false));
             }
         }
@@ -608,6 +731,9 @@ public final class BackroomsEntityManager implements Listener {
             if (bp.display.isValid()) {
                 bp.display.remove();
             }
+        }
+        if (te.kind == EntityKind.SKIN_STEALER || te.kind == EntityKind.FACELESS) {
+            event.getDrops().add(plugin.getItems().looseCoins(1 + ThreadLocalRandom.current().nextInt(3)));
         }
         if (ThreadLocalRandom.current().nextDouble() < 0.35) {
             event.getDrops().add(plugin.getItems().almondWater(1));

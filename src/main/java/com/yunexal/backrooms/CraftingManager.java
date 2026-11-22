@@ -36,6 +36,8 @@ public final class CraftingManager implements Listener {
     private final NamespacedKey keyBarrel;
     private final NamespacedKey keyTorch;
     private final NamespacedKey keyLadder;
+    private final NamespacedKey keyBaseLantern;
+    private final NamespacedKey keySalvageAutopart;
 
     public CraftingManager(YunexalBackroomsPlugin plugin, BackroomsItems items) {
         this.plugin = plugin;
@@ -52,6 +54,8 @@ public final class CraftingManager implements Listener {
         this.keyBarrel = new NamespacedKey(plugin, "recipe_barrel");
         this.keyTorch = new NamespacedKey(plugin, "recipe_torch");
         this.keyLadder = new NamespacedKey(plugin, "recipe_ladder");
+        this.keyBaseLantern = new NamespacedKey(plugin, "recipe_base_lantern");
+        this.keySalvageAutopart = new NamespacedKey(plugin, "recipe_salvage_autopart");
     }
 
     public void registerRecipes() {
@@ -142,12 +146,25 @@ public final class CraftingManager implements Listener {
         ld.shape("P P", "PPP", "P P");
         ld.setIngredient('P', plank);
         Bukkit.addRecipe(ld);
+
+        // 12. Base Emergency Lantern (3x3: metal plates around battery & lamp shard -> static LANTERN for bases)
+        ShapedRecipe bl = new ShapedRecipe(keyBaseLantern, new ItemStack(Material.LANTERN, 1));
+        bl.shape(" M ", "BSB", " M ");
+        bl.setIngredient('M', plate);
+        bl.setIngredient('B', new RecipeChoice.ExactChoice(items.batteryCell(1)));
+        bl.setIngredient('S', shard);
+        Bukkit.addRecipe(bl);
+
+        // 13. Break down rusty autopart -> 2x metal plate
+        ShapelessRecipe sa = new ShapelessRecipe(keySalvageAutopart, items.metalPlate(2));
+        sa.addIngredient(new RecipeChoice.ExactChoice(items.rustyAutopart(1)));
+        Bukkit.addRecipe(sa);
     }
 
     private void removeExisting() {
         for (NamespacedKey key : new NamespacedKey[]{
                 keyWorkbench, keyBandage, keyCrowbar, keyFlashlight, keyMarker, keyDryWallpaper, keyBrokenCompass,
-                keyWoolFiber, keyRedWoolFiber, keyBarrel, keyTorch, keyLadder
+                keyWoolFiber, keyRedWoolFiber, keyBarrel, keyTorch, keyLadder, keyBaseLantern, keySalvageAutopart
         }) {
             Bukkit.removeRecipe(key);
         }
@@ -200,5 +217,7 @@ public final class CraftingManager implements Listener {
                 .append(Component.text("6× Рейок плінтуса + 2× Бляшані пластини (верх/низ)", NamedTextColor.WHITE)));
         player.sendMessage(Component.text("▸ Смолоскип ×2 / Драбина ×2: ", NamedTextColor.YELLOW)
                 .append(Component.text("Уламок над Рейкою / 7× Рейок буквою H", NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("▸ Ліхтар бази / Розбір запчастин: ", NamedTextColor.AQUA)
+                .append(Component.text("Пластини + Батарейки + Уламок / Автозапчастина → 2× Пластини", NamedTextColor.WHITE)));
     }
 }

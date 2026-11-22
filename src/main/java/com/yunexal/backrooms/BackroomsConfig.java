@@ -51,6 +51,20 @@ public final class BackroomsConfig {
     private final double ventChance;
     private final double outletChance;
     private final double dampPillarChance;
+    private final int exitMinSurvivalSeconds;
+
+    private final String level1WorldName;
+    private final long level1Seed;
+    private final int level1FloorY;
+    private final int level1WallHeight;
+    private final double level1WorldBorderSize;
+    private final double level1CrateChancePerRegion;
+    private final int level1DynamicCrateIntervalSeconds;
+    private final int level1DynamicCrateLifetimeSeconds;
+    private final int level1BlackoutIntervalSeconds;
+    private final int level1BlackoutDurationSeconds;
+    private final boolean level1BlackoutEntitySpawns;
+    private final boolean level1FogParticles;
 
     private final boolean ambientEnabled;
     private final long humIntervalTicks;
@@ -109,6 +123,20 @@ public final class BackroomsConfig {
         this.ventChance = clamp01(cfg.getDouble("level0.vent-chance", 0.045));
         this.outletChance = clamp01(cfg.getDouble("level0.outlet-chance", 0.018));
         this.dampPillarChance = clamp01(cfg.getDouble("level0.damp-pillar-chance", 0.18));
+        this.exitMinSurvivalSeconds = Math.max(10, cfg.getInt("level0.exit-min-survival-seconds", 300));
+
+        this.level1WorldName = cfg.getString("level1.world-name", "world_level1");
+        this.level1Seed = cfg.getLong("level1.seed", 19940917L);
+        this.level1FloorY = Math.max(-50, Math.min(200, cfg.getInt("level1.floor-y", 64)));
+        this.level1WallHeight = Math.max(4, Math.min(8, cfg.getInt("level1.wall-height", 5)));
+        this.level1WorldBorderSize = Math.max(256.0, cfg.getDouble("level1.world-border-size", 10000.0));
+        this.level1CrateChancePerRegion = clamp01(cfg.getDouble("level1.crate-chance-per-region", 0.85));
+        this.level1DynamicCrateIntervalSeconds = Math.max(10, cfg.getInt("level1.dynamic-crate-interval-seconds", 28));
+        this.level1DynamicCrateLifetimeSeconds = Math.max(30, cfg.getInt("level1.dynamic-crate-lifetime-seconds", 180));
+        this.level1BlackoutIntervalSeconds = Math.max(45, cfg.getInt("level1.blackout-interval-seconds", 210));
+        this.level1BlackoutDurationSeconds = Math.max(15, cfg.getInt("level1.blackout-duration-seconds", 45));
+        this.level1BlackoutEntitySpawns = cfg.getBoolean("level1.blackout-entity-spawns", true);
+        this.level1FogParticles = cfg.getBoolean("level1.fog-particles", true);
 
         this.ambientEnabled = cfg.getBoolean("ambient.enabled", true);
         this.humIntervalTicks = Math.max(60L, cfg.getLong("ambient.hum-interval-ticks", 300L));
@@ -181,6 +209,21 @@ public final class BackroomsConfig {
     public double getVentChance() { return ventChance; }
     public double getOutletChance() { return outletChance; }
     public double getDampPillarChance() { return dampPillarChance; }
+    public int getExitMinSurvivalSeconds() { return exitMinSurvivalSeconds; }
+
+    public String getLevel1WorldName() { return level1WorldName; }
+    public long getLevel1Seed() { return level1Seed; }
+    public int getLevel1FloorY() { return level1FloorY; }
+    public int getLevel1WallHeight() { return level1WallHeight; }
+    public int getLevel1CeilingY() { return level1FloorY + level1WallHeight + 1; }
+    public double getLevel1WorldBorderSize() { return level1WorldBorderSize; }
+    public double getLevel1CrateChancePerRegion() { return level1CrateChancePerRegion; }
+    public int getLevel1DynamicCrateIntervalSeconds() { return level1DynamicCrateIntervalSeconds; }
+    public int getLevel1DynamicCrateLifetimeSeconds() { return level1DynamicCrateLifetimeSeconds; }
+    public int getLevel1BlackoutIntervalSeconds() { return level1BlackoutIntervalSeconds; }
+    public int getLevel1BlackoutDurationSeconds() { return level1BlackoutDurationSeconds; }
+    public boolean isLevel1BlackoutEntitySpawns() { return level1BlackoutEntitySpawns; }
+    public boolean isLevel1FogParticles() { return level1FogParticles; }
 
     public boolean isAmbientEnabled() { return ambientEnabled; }
     public long getHumIntervalTicks() { return humIntervalTicks; }

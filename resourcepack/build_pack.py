@@ -356,7 +356,50 @@ def generate_textures():
             lad[rung_y, gx] = [120, 124, 126, 255]
     save_png(lad, "ladder.png")
 
-    # 23. Smiler & Hound Custom Item Display Sprites (1.21.4+ / 26.3 items/ + models/item/ + textures/item/)
+    # 23. Level 1 Warehouse Poured Concrete Wall w/ Formwork Seams & Tie-Holes (gray_terracotta.png)
+    rng_w1 = np.random.default_rng(1818)
+    w1 = np.zeros((32, 32, 3), dtype=np.float32)
+    w1[:, :] = [118, 120, 118]
+    w1 += rng_w1.normal(0, 5.2, (32, 32, 1))
+    # Horizontal shuttering / formwork seams
+    for sy in (0, 16):
+        w1[sy, :] -= [14, 14, 14]
+        w1[sy + 1, :] += [6, 6, 6]
+    # Tie-rod bolt recessed dimples
+    for ty in (8, 24):
+        for tx in (8, 24):
+            w1[ty - 1 : ty + 2, tx - 1 : tx + 2] = [68, 70, 70]
+            w1[ty, tx] = [48, 50, 50]
+    # Damp lower floor seepage
+    for y in range(25, 32):
+        w1[y, :] -= (y - 24) * 3.0
+    save_png(w1, "gray_terracotta.png")
+
+    # 24. Level 1 Heavy Reinforced Concrete Warehouse Pillar w/ Hazard Curb (deepslate_bricks.png)
+    rng_p1 = np.random.default_rng(1919)
+    p1 = np.zeros((32, 32, 3), dtype=np.float32)
+    p1[:, :] = [92, 95, 97]
+    p1 += rng_p1.normal(0, 4.5, (32, 32, 1))
+    # Concrete corner chamfers + subtle safety yellow/black industrial stripe near base (rows 24..27)
+    p1[:, 0] -= [14, 14, 14]
+    p1[:, 31] -= [14, 14, 14]
+    for y in range(24, 28):
+        for x in range(32):
+            diag = ((x + y) // 4) % 2 == 0
+            p1[y, x] = [176, 144, 48] if diag else [34, 35, 36]
+    p1[28:32, :] -= [18, 18, 18]
+    save_png(p1, "deepslate_bricks.png")
+
+    # 25. Level 1 Dark Oily Concrete Trim & Pipe Curb (polished_deepslate.png)
+    rng_d1 = np.random.default_rng(2020)
+    d1 = np.zeros((32, 32, 3), dtype=np.float32)
+    d1[:, :] = [66, 68, 70]
+    d1 += rng_d1.normal(0, 3.8, (32, 32, 1))
+    d1[0:2, :] += [10, 10, 10]
+    d1[30:32, :] -= [12, 12, 12]
+    save_png(d1, "polished_deepslate.png")
+
+    # 26. Smiler & Hound Custom Item Display Sprites (1.21.4+ / 26.3 items/ + models/item/ + textures/item/)
     item_tex_dir = os.path.join(PACK_DIR, "assets", "minecraft", "textures", "item")
     item_model_dir = os.path.join(PACK_DIR, "assets", "minecraft", "models", "item")
     item_def_dir = os.path.join(PACK_DIR, "assets", "minecraft", "items")
@@ -820,6 +863,18 @@ def generate_audio():
     hg_lr = fade_edges(hg_lr, sr, fade_in_s=0.05, fade_out_s=0.25)
     synth_ogg(hg_lr, os.path.join(SND_DIR, "entity_hound_growl.ogg"), sr, drive=1.55, target_peak=0.48)
 
+    # 17. level1_blackout_breaker.ogg (1.5s 48kHz heavy warehouse breaker clunk + dying transformer drone)
+    dur_bk = 1.5
+    nbk = int(sr * dur_bk)
+    tbk = np.linspace(0.0, dur_bk, nbk, endpoint=False)
+    clunk = ensure_stereo(0.85 * np.sin(2.0 * np.pi * 68.0 * tbk) * np.exp(-24.0 * tbk))
+    sag_f = 120.0 * np.exp(-2.8 * tbk) + 28.0
+    ph_bk = 2.0 * np.pi * np.cumsum(sag_f) / sr
+    transformer = ensure_stereo(0.32 * np.sin(ph_bk) * np.exp(-2.0 * tbk))
+    bk_lr = corridor_reverb(clunk + transformer, sr, rt60=1.25, wet=0.45, bright_hz=1900.0, seed=171)
+    bk_lr = fade_edges(bk_lr, sr, fade_in_s=0.005, fade_out_s=0.35)
+    synth_ogg(bk_lr, os.path.join(SND_DIR, "level1_blackout_breaker.ogg"), sr, drive=1.25, target_peak=0.48)
+
     write_json(os.path.join(PACK_DIR, "assets", "minecraft", "sounds.json"), {
         "backrooms.ambient.hum": {
             "sounds": [{"name": "backrooms/fluorescent_hum", "stream": False}]
@@ -869,6 +924,9 @@ def generate_audio():
         "backrooms.entity.hound.growl": {
             "sounds": [{"name": "backrooms/entity_hound_growl", "stream": False}]
         },
+        "backrooms.fx.blackout_breaker": {
+            "sounds": [{"name": "backrooms/level1_blackout_breaker", "stream": False}]
+        },
     })
 
 
@@ -882,7 +940,7 @@ def main():
         "pack": {
             "min_format": 97,
             "max_format": 120,
-            "description": "YUNEXAL BACKROOMS // Level 0 Survival, Textures & 48kHz Audio (26.3)",
+            "description": "YUNEXAL BACKROOMS // Level 0 & Level 1 Habitable Zone (26.3)",
         }
     })
 

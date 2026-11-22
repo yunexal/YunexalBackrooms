@@ -38,6 +38,18 @@ public final class BackroomsItems {
     public static final String ID_ALMOND_WATER = "almond_water";
     public static final String ID_BROKEN_COMPASS = "broken_compass";
 
+    // Level 1 ("Habitable Zone") canonical crate loot, trader currency & weird items
+    public static final String ID_CANNED_RATION = "canned_ration";
+    public static final String ID_BATTERY = "battery_cell";
+    public static final String ID_RUSTY_AUTOPART = "rusty_autopart";
+    public static final String ID_USED_SYRINGE = "used_syringe";
+    public static final String ID_CRAYON_BOX = "crayon_box";
+    public static final String ID_BURNT_PAPER = "burnt_paper";
+    public static final String ID_COINS = "loose_coins";
+    public static final String ID_CATATONIC_MOUSE = "catatonia_mouse";
+    public static final String ID_STEEL_MACHETE = "warehouse_machete";
+    public static final String ID_EXPLORER_HELMET = "explorer_helmet";
+
     private final NamespacedKey itemKey;
 
     public BackroomsItems(YunexalBackroomsPlugin plugin) {
@@ -214,6 +226,109 @@ public final class BackroomsItems {
                 Component.text("ПРАВИЛА ВИЖИВАННЯ:\n\n1. НІКОЛИ не пийте рідину з вологих килимів.\n2. Остерігайтеся Червоних кімнат і глибоких темних ям (особливо коли втомлені чи спраглі!).\n3. Рідкісні темні западини («м'який килим») провалюють до межі Рівня 1."),
                 Component.text("ІМПРОВІЗАЦІЯ ТА БАЗИ:\n\nРежим Виживання: ламайте стіни, зривайте ковролін (під ним бетон), будуйте укриття й сховища!\n\nКоманда /br craft відкриває всі рецепти. Зберіть 4 рейки для верстака 3x3!"),
                 Component.text("ОСНОВНІ СХЕМИ:\n\n- Верстак: 4 рейки (2x2)\n- Бинт: 2 волокна + шпалера\n- Мітка: 2 шпалери + волокно\n- Лом: 2 пластини + рейка\n- Ліхтар: уламок + дріт + пластина")
+        );
+        book.setItemMeta(meta);
+        return book;
+    }
+
+    public ItemStack cannedRation(int amount) {
+        return build(Material.COOKED_BEEF, amount, ID_CANNED_RATION,
+                Component.text("Консерви M.E.G.", NamedTextColor.GOLD),
+                List.of(
+                        Component.text("Армійська тушкованка з ящика Рівня 1.", NamedTextColor.GRAY),
+                        Component.text("Надійно втамовує голод на вилазках.", NamedTextColor.GREEN)
+                ), false);
+    }
+
+    public ItemStack batteryCell(int amount) {
+        return build(Material.AMETHYST_SHARD, amount, ID_BATTERY,
+                Component.text("Лужна батарейка", NamedTextColor.AQUA),
+                List.of(
+                        Component.text("Живлення для ліхтарів та обмін у B.N.T.G.", NamedTextColor.GRAY),
+                        Component.text("ПКМ — короткий імпульс ясності.", NamedTextColor.DARK_GRAY)
+                ), false);
+    }
+
+    public ItemStack rustyAutopart(int amount) {
+        return build(Material.RAW_IRON, amount, ID_RUSTY_AUTOPART,
+                Component.text("Іржаві автозапчастини", NamedTextColor.GRAY),
+                List.of(
+                        Component.text("Поршень чи шестерня невідомого авто з ящика.", NamedTextColor.GRAY),
+                        Component.text("Приймають торговці B.N.T.G. за припаси.", NamedTextColor.DARK_GRAY)
+                ), false);
+    }
+
+    public ItemStack usedSyringe(int amount) {
+        return build(Material.BLAZE_ROD, amount, ID_USED_SYRINGE,
+                Component.text("Використаний шприц", NamedTextColor.RED),
+                List.of(
+                        Component.text("Безглузда та небезпечна знахідка з ящика Рівня 1.", NamedTextColor.GRAY),
+                        Component.text("Обережно — голка забруднена!", NamedTextColor.DARK_RED)
+                ), false);
+    }
+
+    public ItemStack crayonBox(int amount) {
+        return build(Material.YELLOW_DYE, amount, ID_CRAYON_BOX,
+                Component.text("Коробка кольорових олівців", NamedTextColor.YELLOW),
+                List.of(
+                        Component.text("Наполовину сточені воскові олівці з ящика.", NamedTextColor.GRAY),
+                        Component.text("Незрозуміло, хто й навіщо їх поклав.", NamedTextColor.DARK_GRAY)
+                ), false);
+    }
+
+    public ItemStack burntPaper(int amount) {
+        return build(Material.PAPER, amount, ID_BURNT_PAPER,
+                Component.text("Частково спалений папір", NamedTextColor.GRAY),
+                List.of(
+                        Component.text("Обгорілі уривки нерозбірливого журналу.", NamedTextColor.GRAY)
+                ), false);
+    }
+
+    public ItemStack looseCoins(int amount) {
+        return build(Material.RAW_GOLD, amount, ID_COINS,
+                Component.text("Жменя дрібних монет", NamedTextColor.GOLD),
+                List.of(
+                        Component.text("Старі потерті монети, що з'являються у ящиках.", NamedTextColor.GRAY),
+                        Component.text("Головна розмінна монета B.N.T.G. на Рівні 1.", NamedTextColor.YELLOW)
+                ), false);
+    }
+
+    public ItemStack catatonicMouse(int amount) {
+        return build(Material.ROTTEN_FLESH, amount, ID_CATATONIC_MOUSE,
+                Component.text("Кататонічна миша", NamedTextColor.DARK_GRAY),
+                List.of(
+                        Component.text("Ледве дихає... типовий дивний вміст ящика.", NamedTextColor.GRAY),
+                        Component.text("Їсти її — жахлива ідея.", NamedTextColor.RED)
+                ), false);
+    }
+
+    public ItemStack warehouseMachete() {
+        return build(Material.IRON_SWORD, 1, ID_STEEL_MACHETE,
+                Component.text("Складський тесак", NamedTextColor.WHITE),
+                List.of(
+                        Component.text("Важке лезо з аванпостів M.E.G.", NamedTextColor.GRAY),
+                        Component.text("Ефективний проти Гончаків та Шкірокрадів.", NamedTextColor.AQUA)
+                ), true);
+    }
+
+    public ItemStack explorerHelmet() {
+        return build(Material.CHAINMAIL_HELMET, 1, ID_EXPLORER_HELMET,
+                Component.text("Каска дослідника B.N.T.G.", NamedTextColor.YELLOW),
+                List.of(
+                        Component.text("Посилена будівельна каска для темних складів.", NamedTextColor.GRAY)
+                ), true);
+    }
+
+    public ItemStack createLevel1ManualBook() {
+        ItemStack book = new ItemStack(Material.WRITTEN_BOOK, 1);
+        BookMeta meta = (BookMeta) book.getItemMeta();
+        meta.setTitle("Протокол M.E.G. // Рівень 1");
+        meta.setAuthor("База Альфа [M.E.G.]");
+        meta.addPages(
+                Component.text("РІВЕНЬ 1: «НАСЕЛЕНА ЗОНА»\nКлас виживання: 2\n\nВи прорвалися крізь блимаючу стіну з Рівня 0 у гігантські бетонні склади.\nТут є низький туман, калюжі конденсату й сліди людства."),
+                Component.text("ЯЩИКИ ПОСТАЧАННЯ:\n\nДерев'яні ящики матеріалізуються та зникають самі по собі.\nУсередині можна знайти Мигдальну воду, консерви, батарейки, зброю... або ж абсурдні речі на кшталт олівців, шприців чи автозапчастин."),
+                Component.text("МЕРЕХТІННЯ (BLACKOUT):\n\nПеріодично світло на всьому рівні блимає й гасне!\nУ темряві пробуджуються Усміхнені, Гончаки, Безликі та Шкірокради.\nТримайте ліхтар напоготові або сховайтеся на базі."),
+                Component.text("АВАНПОСТИ ЛЮДСТВА:\n\n▸ База Альфа (M.E.G.)\n▸ Дім Торговця (B.N.T.G. — обмін монет, запчастин і батарейок)\n▸ Їдальня Тома\n\nБережіть припаси — ви все ще у режимі виживання!")
         );
         book.setItemMeta(meta);
         return book;

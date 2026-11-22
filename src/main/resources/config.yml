@@ -5,9 +5,9 @@
 resource-pack:
   enabled: true
   url: "https://mirror.yunexal.com/packs/YunexalBackrooms-RP.zip"
-  sha1: "f0b50d9294ec9c4393cf80f1aa264f6e3c3c0e82"
+  sha1: "ada76a218c1eb0ec6260e4fae2b085129a254e10"
   required: true
-  prompt: "&e&lYUNEXAL BACKROOMS\n&7Для входу на &fРівень 0 «Лобі» &7обов'язково прийміть ресурс-пак.\n&8Текстури шпалер, ям, арок і бетону, 48kHz аудіо та 3D сутності."
+  prompt: "&e&lYUNEXAL BACKROOMS\n&7Для входу на &fРівні 0 і 1 &7обов'язково прийміть ресурс-пак.\n&8Шпалери, бетонні склади, 48kHz аудіо та 3D сутності."
   timeout-seconds: 45
   send-delay-ticks: 10
   fallback-server: "hub1"
@@ -42,6 +42,21 @@ level0:
   vent-chance: 0.045
   outlet-chance: 0.018
   damp-pillar-chance: 0.18
+  exit-min-survival-seconds: 300
+
+level1:
+  world-name: "world_level1"
+  seed: 19940917
+  floor-y: 64
+  wall-height: 5
+  world-border-size: 10000.0
+  crate-chance-per-region: 0.85
+  dynamic-crate-interval-seconds: 28
+  dynamic-crate-lifetime-seconds: 180
+  blackout-interval-seconds: 210
+  blackout-duration-seconds: 45
+  blackout-entity-spawns: true
+  fog-particles: true
 
 ambient:
   enabled: true
