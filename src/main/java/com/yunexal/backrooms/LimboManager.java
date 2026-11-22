@@ -300,7 +300,7 @@ public final class LimboManager implements Listener {
         }
 
         if (playNoclip) {
-            player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.85f, 1.0f);
+            player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.65f, 1.0f);
         }
 
         player.showTitle(Title.title(

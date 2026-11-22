@@ -152,19 +152,19 @@ public final class BackroomsListeners implements Listener {
             if (zone == Level0ChunkGenerator.ZoneType.RED_ROOM) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 85, 0, false, false, false));
                 long prevPulse = lastRedPulseAtMs.getOrDefault(uid, 0L);
-                if (now - prevPulse >= 4200L) {
+                if (now - prevPulse >= 3800L) {
                     lastRedPulseAtMs.put(uid, now);
-                    player.playSound(player, "minecraft:backrooms.ambient.red_pulse", SoundCategory.AMBIENT, 0.65f, 1.0f);
+                    player.playSound(player, "minecraft:backrooms.ambient.red_pulse", SoundCategory.AMBIENT, 0.30f, 1.0f);
                 }
                 continue;
             }
 
-            // Head-attached 60/100Hz fluorescent hum (never jumps spatially while moving)
+            // Head-attached 60/120Hz fluorescent hum (never jumps spatially while moving)
             long prevHum = lastHumAtMs.getOrDefault(uid, 0L);
             if (now - prevHum >= humIntervalMs) {
                 lastHumAtMs.put(uid, now);
-                float volume = (zone == Level0ChunkGenerator.ZoneType.BLACKOUT_ZONE) ? 0.22f
-                        : (zone == Level0ChunkGenerator.ZoneType.MANILA_ROOM ? 0.28f : 0.48f);
+                float volume = (zone == Level0ChunkGenerator.ZoneType.BLACKOUT_ZONE) ? 0.10f
+                        : (zone == Level0ChunkGenerator.ZoneType.MANILA_ROOM ? 0.12f : 0.22f);
                 player.playSound(player, "minecraft:backrooms.ambient.hum", SoundCategory.AMBIENT, volume, 1.0f);
             }
 
@@ -174,7 +174,7 @@ public final class BackroomsListeners implements Listener {
                 Location lampLoc = findNearestFlickeringLamp(level0, loc.getBlockX(), ceilingY, loc.getBlockZ());
                 if (lampLoc != null) {
                     lastFlickerAtMs.put(uid, now);
-                    player.playSound(lampLoc, "minecraft:backrooms.ambient.flicker", SoundCategory.BLOCKS, 0.42f, 1.0f);
+                    player.playSound(lampLoc, "minecraft:backrooms.ambient.flicker", SoundCategory.BLOCKS, 0.24f, 1.0f);
                 }
             }
 
@@ -183,8 +183,8 @@ public final class BackroomsListeners implements Listener {
                 double angle = rng.nextDouble() * Math.PI * 2.0;
                 double dist = 12.0 + rng.nextDouble() * 8.0;
                 Location soundLoc = loc.clone().add(Math.cos(angle) * dist, 0.5, Math.sin(angle) * dist);
-                player.playSound(soundLoc, "minecraft:backrooms.ambient.thump", SoundCategory.AMBIENT, 0.35f,
-                        0.82f + rng.nextFloat() * 0.22f);
+                player.playSound(soundLoc, "minecraft:backrooms.ambient.thump", SoundCategory.AMBIENT, 0.22f,
+                        0.85f + rng.nextFloat() * 0.18f);
             }
         }
     }
@@ -338,7 +338,7 @@ public final class BackroomsListeners implements Listener {
 
     private void triggerSoftCarpetNoclip(Player player, World level0) {
         restoreFlashlight(player);
-        player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.9f, 1.0f);
+        player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.65f, 1.0f);
         player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 36, 0, false, false, false));
         player.showTitle(Title.title(
                 Component.text("МЕЖА РІВНЯ 1", NamedTextColor.GRAY, TextDecoration.BOLD),

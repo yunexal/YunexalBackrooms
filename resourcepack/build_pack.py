@@ -279,19 +279,114 @@ def generate_textures():
     save_png(red_lamp, "shroomlight.png")
 
 
-def synth_ogg(samples_lr, out_ogg, sr=48000):
+def _next_pow2(n):
+    p = 1
+    while p < n:
+        p <<= 1
+    return p
+
+
+def ensure_stereo(sig):
+    arr = np.asarray(sig, dtype=np.float64)
+    if arr.ndim == 1:
+        return np.column_stack((arr, arr))
+    return arr.copy()
+
+
+def fft_band(sig, sr, low_hz=None, high_hz=None, order=2.0):
+    arr = np.asarray(sig, dtype=np.float64)
+    n = arr.shape[0]
+    freqs = np.fft.rfftfreq(n, 1.0 / sr)
+    h = np.ones_like(freqs)
+    if low_hz is not None and low_hz > 0.0:
+        r = freqs / low_hz
+        h *= np.sqrt((r ** (2.0 * order)) / (1.0 + r ** (2.0 * order)))
+        h[0] = 0.0
+    if high_hz is not None and high_hz > 0.0:
+        r = freqs / high_hz
+        h *= np.sqrt(1.0 / (1.0 + r ** (2.0 * order)))
+    if arr.ndim == 1:
+        return np.fft.irfft(np.fft.rfft(arr) * h, n=n)
+    out = np.empty_like(arr)
+    for ch in range(arr.shape[1]):
+        out[:, ch] = np.fft.irfft(np.fft.rfft(arr[:, ch]) * h, n=n)
+    return out
+
+
+def corridor_reverb(sig, sr, rt60=0.75, wet=0.26, bright_hz=2300.0, seed=77):
+    dry = ensure_stereo(sig)
+    n = dry.shape[0]
+    ir_len = max(int(sr * min(rt60 * 1.3, 2.2)), 512)
+    rng = np.random.default_rng(seed)
+
+    ir = np.zeros((ir_len, 2), dtype=np.float64)
+    # Carpeted gypsum-wall hallway early reflections (asymmetric L/R spatial width)
+    taps = [
+        (0.0113, 0.36, 0.21),
+        (0.0179, 0.19, 0.34),
+        (0.0274, 0.25, 0.14),
+        (0.0391, 0.12, 0.20),
+        (0.0543, 0.15, 0.09),
+        (0.0725, 0.07, 0.11),
+    ]
+    for delay_s, gl, gr in taps:
+        idx = int(delay_s * sr)
+        if idx < ir_len:
+            ir[idx, 0] += gl
+            ir[idx, 1] += gr
+
+    t_ir = np.arange(ir_len, dtype=np.float64) / sr
+    start_idx = int(0.028 * sr)
+    tail_env = np.zeros(ir_len, dtype=np.float64)
+    tail_env[start_idx:] = np.exp(-6.907755 * (t_ir[start_idx:] - 0.028) / max(rt60, 0.1))
+    diffuse = rng.normal(0.0, 1.0, (ir_len, 2)) * tail_env[:, None]
+    diffuse = fft_band(diffuse, sr, low_hz=95.0, high_hz=bright_hz, order=1.5)
+    diffuse /= (np.sqrt(np.mean(diffuse ** 2)) + 1e-9)
+    ir += diffuse * 0.038
+
+    n_fft = _next_pow2(n + ir_len - 1)
+    rev = np.empty_like(dry)
+    for ch in range(2):
+        conv = np.fft.irfft(np.fft.rfft(dry[:, ch], n=n_fft) * np.fft.rfft(ir[:, ch], n=n_fft), n=n_fft)
+        rev[:, ch] = conv[:n]
+
+    return dry * (1.0 - wet * 0.32) + rev * wet
+
+
+def fade_edges(sig, sr, fade_in_s=0.01, fade_out_s=0.02, equal_power=False):
+    arr = ensure_stereo(sig)
+    n = arr.shape[0]
+    fi = min(int(round(fade_in_s * sr)), n // 2)
+    fo = min(int(round(fade_out_s * sr)), n // 2)
+    if fi > 0:
+        u = np.linspace(0.0, 1.0, fi, endpoint=True)
+        w = np.sin(0.5 * np.pi * u) if equal_power else 0.5 * (1.0 - np.cos(np.pi * u))
+        arr[:fi] *= w[:, None]
+    if fo > 0:
+        u = np.linspace(0.0, 1.0, fo, endpoint=True)
+        w = np.cos(0.5 * np.pi * u) if equal_power else 0.5 * (1.0 + np.cos(np.pi * u))
+        arr[n - fo:] *= w[:, None]
+    return arr
+
+
+def synth_ogg(samples_lr, out_ogg, sr=48000, drive=1.0, target_peak=None):
     os.makedirs(os.path.dirname(out_ogg), exist_ok=True)
     tmp_wav = out_ogg + ".tmp.wav"
-    if samples_lr.ndim == 1:
-        samples_lr = np.column_stack((samples_lr, samples_lr))
-    pcm = np.clip(samples_lr * 32767.0, -32767, 32767).astype(np.int16)
+    arr = ensure_stereo(samples_lr)
+    if drive != 1.0:
+        arr = np.tanh(arr * drive) / np.tanh(drive)
+    if target_peak is not None:
+        mx = np.max(np.abs(arr))
+        if mx > 1e-6:
+            arr *= target_peak / mx
+    pcm = np.clip(arr * 32767.0, -32767, 32767).astype(np.int16)
     with wave.open(tmp_wav, "wb") as wf:
         wf.setnchannels(2)
         wf.setsampwidth(2)
         wf.setframerate(sr)
         wf.writeframes(pcm.tobytes())
     subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", tmp_wav, "-c:a", "libvorbis", "-q:a", "6", out_ogg],
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", tmp_wav, "-c:a", "libvorbis", "-q:a", "7", out_ogg],
         check=True,
     )
     os.remove(tmp_wav)
@@ -300,96 +395,192 @@ def synth_ogg(samples_lr, out_ogg, sr=48000):
 def generate_audio():
     sr = 48000
 
-    # 1. fluorescent_hum.ogg (16.0s studio 48kHz seamless warm loop optimized for headphones)
+    # 1. fluorescent_hum.ogg (16.0s 48kHz seamless constant-power 1s crossfade @ 15.0s, warm & gentle)
+    # 60Hz/120Hz/180Hz completes exact integer cycles at 15.0s -> zero phase cancellation when looped
     dur = 16.0
     n = int(sr * dur)
-    t = np.linspace(0, dur, n, endpoint=False)
+    t = np.linspace(0.0, dur, n, endpoint=False)
     rng = np.random.default_rng(901)
 
-    # Warm deep transformer hum (100Hz + subtle 200Hz harmonic; zero harsh 60Hz buzz/grit)
-    hum = (
-        0.24 * np.sin(2 * np.pi * 100.0 * t)
-        + 0.09 * np.sin(2 * np.pi * 200.0 * t + 0.35)
-        + 0.03 * np.sin(2 * np.pi * 300.0 * t + 1.1)
+    transformer = (
+        0.18 * np.sin(2.0 * np.pi * 60.0 * t)
+        + 0.11 * np.sin(2.0 * np.pi * 120.0 * t)
+        + 0.032 * np.sin(2.0 * np.pi * 180.0 * t)
+        + 0.012 * np.sin(2.0 * np.pi * 240.0 * t)
     )
+    lfo = 0.94 + 0.04 * np.sin(2.0 * np.pi * (4.0 / 15.0) * t) + 0.02 * np.sin(2.0 * np.pi * (11.0 / 15.0) * t)
 
-    # Smooth pink/brown air-ballast ambience via FFT spectral shaping (periodic by construction -> zero loop click!)
-    white_l = rng.normal(0, 1.0, n)
-    white_r = rng.normal(0, 1.0, n)
+    # Warm HVAC & damp hallway room tone (strictly damped above 1.9kHz so zero harsh hiss)
+    air = rng.normal(0.0, 1.0, (n, 2))
     freqs = np.fft.rfftfreq(n, 1.0 / sr)
-    # 1/sqrt(f) pink slope + gentle rolloff above 3.8kHz for silky headphone comfort
-    shape = np.where(freqs > 18.0, 1.0 / np.sqrt(np.maximum(freqs, 20.0)), 0.0) * np.exp(-freqs / 4200.0)
-    air_l = np.fft.irfft(np.fft.rfft(white_l) * shape, n=n)
-    air_r = np.fft.irfft(np.fft.rfft(white_r) * shape, n=n)
-    air_l = air_l / (np.std(air_l) + 1e-6) * 0.065
-    air_r = air_r / (np.std(air_r) + 1e-6) * 0.065
+    room_shape = np.where(freqs > 28.0, 1.0 / (np.maximum(freqs, 28.0) ** 0.72), 0.0) * np.exp(-freqs / 1600.0)
+    air_l = np.fft.irfft(np.fft.rfft(air[:, 0]) * room_shape, n=n)
+    air_r = np.fft.irfft(np.fft.rfft(air[:, 1]) * room_shape, n=n)
+    air_l = air_l / (np.std(air_l) + 1e-9) * 0.024
+    air_r = air_r / (np.std(air_r) + 1e-9) * 0.024
 
-    lfo = 0.94 + 0.06 * np.sin(2 * np.pi * (2.0 / dur) * t)
-    sig_l = (hum + air_l) * lfo * 0.42
-    sig_r = (hum * 0.98 + air_r) * lfo * 0.42
-    synth_ogg(np.column_stack((sig_l, sig_r)), os.path.join(SND_DIR, "fluorescent_hum.ogg"), sr)
+    hum_lr = np.column_stack((transformer * lfo + air_l, transformer * 0.97 * lfo + air_r))
+    hum_lr = corridor_reverb(hum_lr, sr, rt60=0.45, wet=0.18, bright_hz=1200.0, seed=11)
+    hum_lr = fade_edges(hum_lr, sr, fade_in_s=1.0, fade_out_s=1.0, equal_power=True)
+    synth_ogg(hum_lr, os.path.join(SND_DIR, "fluorescent_hum.ogg"), sr, drive=1.08, target_peak=0.18)
 
-    # 2. light_flicker.ogg (1.2s 48kHz crisp ballast buzz/crackle)
-    dur_f = 1.2
+    # 2. light_flicker.ogg (1.4s 48kHz faulty magnetic ballast & glass-tube corona arc in corridor)
+    dur_f = 1.4
     nf = int(sr * dur_f)
-    tf = np.linspace(0, dur_f, nf, endpoint=False)
-    buzz = 0.25 * np.sin(2 * np.pi * 100.0 * tf) + 0.16 * np.sin(2 * np.pi * 200.0 * tf)
-    clicks = np.zeros_like(tf)
-    for ts in (0.09, 0.16, 0.41, 0.48, 0.84):
-        idx = int(ts * sr)
-        clicks[idx : idx + 220] = rng.normal(0, 0.45, 220) * np.exp(-np.linspace(0, 6, 220))
-    env = np.sin(np.pi * tf / dur_f) ** 0.5
-    f_sig = (buzz * 0.35 + clicks) * env * 0.55
-    synth_ogg(f_sig, os.path.join(SND_DIR, "light_flicker.ogg"), sr)
-
-    # 3. noclip.ogg (1.4s 48kHz stereo sub-bass reality tear)
-    dur_n = 1.4
-    tn = np.linspace(0, dur_n, int(sr * dur_n), endpoint=False)
-    freq_sweep = 115.0 * np.exp(-2.8 * tn) + 32.0
-    phase = 2 * np.pi * np.cumsum(freq_sweep) / sr
-    sub = np.sin(phase) * np.exp(-1.9 * tn)
-    tear = np.convolve(rng.normal(0, 0.28, len(tn)) * np.exp(-5.5 * tn), np.ones(12) / 12.0, mode="same")
-    n_sig = np.tanh((sub * 0.72 + tear * 0.5) * 1.35) * 0.72
-    synth_ogg(n_sig, os.path.join(SND_DIR, "noclip.ogg"), sr)
-
-    # 4. distant_thump.ogg (1.6s 48kHz muffled hallway echo)
-    dur_d = 1.6
-    td = np.linspace(0, dur_d, int(sr * dur_d), endpoint=False)
-    thud = np.sin(2 * np.pi * 48.0 * td) * np.exp(-3.6 * td)
-    tail = np.convolve(rng.normal(0, 0.12, len(td)) * np.exp(-2.8 * td), np.ones(90) / 90.0, mode="same")
-    d_sig = (thud * 0.65 + tail * 0.5) * 0.7
-    synth_ogg(d_sig, os.path.join(SND_DIR, "distant_thump.ogg"), sr)
-
-    # 5. wallpaper_tear.ogg (0.45s crisp paper ripping sound)
-    dur_w = 0.45
-    tw = np.linspace(0, dur_w, int(sr * dur_w), endpoint=False)
-    w_noise = rng.normal(0, 1.0, len(tw))
-    band = w_noise - np.convolve(w_noise, np.ones(18) / 18.0, mode="same")
-    w_env = (np.sin(np.pi * tw / dur_w) ** 0.7) * (0.65 + 0.35 * np.sin(2 * np.pi * 24.0 * tw))
-    synth_ogg(band * w_env * 0.32, os.path.join(SND_DIR, "wallpaper_tear.ogg"), sr)
-
-    # 6. carpet_rip.ogg (0.42s muffled fibrous tear)
-    dur_c = 0.42
-    tc = np.linspace(0, dur_c, int(sr * dur_c), endpoint=False)
-    c_noise = np.convolve(rng.normal(0, 1.0, len(tc)), np.ones(14) / 14.0, mode="same")
-    c_env = np.sin(np.pi * tc / dur_c) ** 0.8
-    synth_ogg(c_noise * c_env * 0.48, os.path.join(SND_DIR, "carpet_rip.ogg"), sr)
-
-    # 7. metal_pry.ogg (0.5s metallic vent clank)
-    dur_m = 0.5
-    tm = np.linspace(0, dur_m, int(sr * dur_m), endpoint=False)
-    clang = (
-        0.4 * np.sin(2 * np.pi * 420.0 * tm) * np.exp(-10.0 * tm)
-        + 0.3 * np.sin(2 * np.pi * 890.0 * tm) * np.exp(-14.0 * tm)
-        + 0.2 * np.sin(2 * np.pi * 1410.0 * tm) * np.exp(-18.0 * tm)
+    tf = np.linspace(0.0, dur_f, nf, endpoint=False)
+    # Stuttering magnetic shutter modulation
+    shutter = 0.25 + 0.75 * np.clip(
+        0.5 + 0.5 * np.sin(2.0 * np.pi * 17.0 * tf) * np.cos(2.0 * np.pi * 6.5 * tf), 0.0, 1.0
     )
-    synth_ogg(clang * 0.65, os.path.join(SND_DIR, "metal_pry.ogg"), sr)
+    coil = (0.18 * np.sin(2.0 * np.pi * 120.0 * tf) + 0.12 * np.sin(2.0 * np.pi * 240.0 * tf)
+            + 0.06 * np.sin(2.0 * np.pi * 680.0 * tf)) * shutter
 
-    # 8. red_room_pulse.ogg (2.5s eerie deep dread drone)
-    dur_r = 2.5
-    tr = np.linspace(0, dur_r, int(sr * dur_r), endpoint=False)
-    pulse = (0.45 * np.sin(2 * np.pi * 55.0 * tr) + 0.28 * np.sin(2 * np.pi * 57.5 * tr)) * np.sin(np.pi * tr / dur_r)
-    synth_ogg(pulse * 0.55, os.path.join(SND_DIR, "red_room_pulse.ogg"), sr)
+    arc_l = np.zeros(nf, dtype=np.float64)
+    arc_r = np.zeros(nf, dtype=np.float64)
+    for ts, amp in ((0.08, 0.9), (0.14, 0.55), (0.37, 1.0), (0.43, 0.7), (0.68, 0.45), (0.89, 0.85), (0.94, 0.5)):
+        idx = int(ts * sr)
+        burst_len = min(int(0.032 * sr), nf - idx)
+        if burst_len <= 0:
+            continue
+        tb = np.arange(burst_len, dtype=np.float64) / sr
+        b_env = np.exp(-tb / 0.0055) * (1.0 - np.exp(-tb / 0.0005))
+        plasma = rng.normal(0.0, 1.0, burst_len) * b_env * amp
+        res = (0.45 * np.sin(2.0 * np.pi * 1850.0 * tb) + 0.30 * np.sin(2.0 * np.pi * 3120.0 * tb)) * b_env * amp
+        arc_l[idx:idx + burst_len] += plasma * 0.45 + res * 0.35
+        arc_r[idx:idx + burst_len] += rng.normal(0.0, 1.0, burst_len) * b_env * amp * 0.45 + res * 0.32
+
+    arc_lr = fft_band(np.column_stack((arc_l, arc_r)), sr, low_hz=450.0, high_hz=4800.0, order=2.0)
+    flicker_lr = np.column_stack((coil * 0.32, coil * 0.30)) + arc_lr * 0.72
+    flicker_lr = corridor_reverb(flicker_lr, sr, rt60=0.55, wet=0.32, bright_hz=2800.0, seed=22)
+    flicker_lr = fade_edges(flicker_lr, sr, fade_in_s=0.04, fade_out_s=0.22)
+    synth_ogg(flicker_lr, os.path.join(SND_DIR, "light_flicker.ogg"), sr, drive=1.15, target_peak=0.38)
+
+    # 3. noclip.ogg (1.6s 48kHz supernatural vacuum intake + sub-drop + hollow hallway shimmer)
+    dur_n = 1.6
+    nn = int(sr * dur_n)
+    tn = np.linspace(0.0, dur_n, nn, endpoint=False)
+    split = int(0.24 * sr)
+
+    # Brief reverse air-suction swell into reality drop
+    t_pre = tn[:split]
+    swell_env = (t_pre / 0.24) ** 2.4
+    whoosh_pre = fft_band(rng.normal(0.0, 1.0, (split, 2)), sr, low_hz=180.0, high_hz=1600.0, order=1.5) * swell_env[:, None]
+
+    t_post = tn[split:] - 0.24
+    freq_drop = 88.0 * np.exp(-3.2 * t_post) + 28.0
+    ph_drop = 2.0 * np.pi * np.cumsum(freq_drop) / sr
+    sub_drop = (np.sin(ph_drop) + 0.35 * np.sin(2.0 * ph_drop)) * np.exp(-2.1 * t_post) * (1.0 - np.exp(-t_post / 0.008))
+    shimmer = (0.10 * np.sin(2.0 * np.pi * 528.0 * t_post) + 0.07 * np.sin(2.0 * np.pi * 792.0 * t_post)) * np.exp(-2.8 * t_post)
+    air_post = fft_band(rng.normal(0.0, 1.0, (len(t_post), 2)), sr, low_hz=90.0, high_hz=720.0, order=1.8) * np.exp(-4.0 * t_post)[:, None]
+
+    post_lr = np.column_stack((sub_drop * 0.8 + shimmer, sub_drop * 0.8 - shimmer * 0.4)) + air_post * 0.28
+    noclip_lr = np.vstack((whoosh_pre * 0.45, post_lr))
+    noclip_lr = corridor_reverb(noclip_lr, sr, rt60=0.95, wet=0.38, bright_hz=2100.0, seed=33)
+    noclip_lr = fade_edges(noclip_lr, sr, fade_in_s=0.03, fade_out_s=0.35)
+    synth_ogg(noclip_lr, os.path.join(SND_DIR, "noclip.ogg"), sr, drive=1.45, target_peak=0.58)
+
+    # 4. distant_thump.ogg (1.8s 48kHz heavy drywall/door thud echoing down empty corridor)
+    dur_d = 1.8
+    nd = int(sr * dur_d)
+    td = np.linspace(0.0, dur_d, nd, endpoint=False)
+    thump_f = 78.0 * np.exp(-28.0 * td) + 41.0
+    thump_ph = 2.0 * np.pi * np.cumsum(thump_f) / sr
+    body = (0.72 * np.sin(thump_ph) * np.exp(-6.5 * td)
+            + 0.30 * np.sin(2.0 * np.pi * 112.0 * td) * np.exp(-16.0 * td)
+            + 0.14 * np.sin(2.0 * np.pi * 235.0 * td) * np.exp(-28.0 * td))
+    wood_hit = fft_band(rng.normal(0.0, 1.0, (nd, 2)), sr, low_hz=70.0, high_hz=580.0, order=2.0) * np.exp(-22.0 * td)[:, None]
+    thump_lr = ensure_stereo(body * (1.0 - np.exp(-td / 0.004))) + wood_hit * 0.42
+    # Muffle highs strongly as if coming around two hallway corners
+    thump_lr = fft_band(thump_lr, sr, low_hz=28.0, high_hz=520.0, order=2.0)
+    thump_lr = corridor_reverb(thump_lr, sr, rt60=1.05, wet=0.52, bright_hz=680.0, seed=44)
+    thump_lr = fade_edges(thump_lr, sr, fade_in_s=0.005, fade_out_s=0.45)
+    synth_ogg(thump_lr, os.path.join(SND_DIR, "distant_thump.ogg"), sr, drive=1.15, target_peak=0.44)
+
+    # 5. wallpaper_tear.ogg (0.55s 48kHz crisp dry cellulose paper tearing off plaster wall)
+    dur_w = 0.55
+    nw = int(sr * dur_w)
+    tw = np.linspace(0.0, dur_w, nw, endpoint=False)
+    snaps_l = np.zeros(nw, dtype=np.float64)
+    snaps_r = np.zeros(nw, dtype=np.float64)
+    for _ in range(64):
+        pos = int(rng.uniform(0.02, dur_w - 0.06) * sr)
+        elen = min(int(0.009 * sr), nw - pos)
+        te = np.arange(elen, dtype=np.float64) / sr
+        f_snap = rng.uniform(1350.0, 4200.0)
+        grain = np.sin(2.0 * np.pi * f_snap * te) * np.exp(-te / 0.0018) * rng.uniform(0.3, 1.0)
+        pan = rng.uniform(0.35, 0.65)
+        snaps_l[pos:pos + elen] += grain * (1.0 - pan)
+        snaps_r[pos:pos + elen] += grain * pan
+    pull_curve = (np.sin(np.pi * tw / dur_w) ** 0.65) * (0.75 + 0.25 * np.sin(2.0 * np.pi * 11.0 * tw + 0.6))
+    paper_body = fft_band(rng.normal(0.0, 1.0, (nw, 2)), sr, low_hz=680.0, high_hz=4800.0, order=2.0) * pull_curve[:, None]
+    wall_tap = ensure_stereo(0.22 * np.sin(2.0 * np.pi * 115.0 * tw) * np.exp(-32.0 * tw))
+    wp_lr = np.column_stack((snaps_l, snaps_r)) * 0.55 + paper_body * 0.42 + wall_tap
+    wp_lr = corridor_reverb(wp_lr, sr, rt60=0.35, wet=0.20, bright_hz=3200.0, seed=55)
+    wp_lr = fade_edges(wp_lr, sr, fade_in_s=0.008, fade_out_s=0.08)
+    synth_ogg(wp_lr, os.path.join(SND_DIR, "wallpaper_tear.ogg"), sr, drive=1.1, target_peak=0.45)
+
+    # 6. carpet_rip.ogg (0.48s 48kHz coarse damp wool & adhesive subfloor peel)
+    dur_c = 0.48
+    nc = int(sr * dur_c)
+    tc = np.linspace(0.0, dur_c, nc, endpoint=False)
+    peel_env = (np.sin(np.pi * tc / dur_c) ** 0.75) * (0.72 + 0.28 * np.cos(2.0 * np.pi * 9.0 * tc))
+    fibers = fft_band(rng.normal(0.0, 1.0, (nc, 2)), sr, low_hz=260.0, high_hz=2100.0, order=2.0) * peel_env[:, None]
+    glue_l = np.zeros(nc, dtype=np.float64)
+    glue_r = np.zeros(nc, dtype=np.float64)
+    for _ in range(36):
+        pos = int(rng.uniform(0.03, dur_c - 0.05) * sr)
+        elen = min(int(0.012 * sr), nc - pos)
+        te = np.arange(elen, dtype=np.float64) / sr
+        pop = np.sin(2.0 * np.pi * rng.uniform(420.0, 950.0) * te) * np.exp(-te / 0.0028) * rng.uniform(0.3, 0.9)
+        glue_l[pos:pos + elen] += pop * rng.uniform(0.4, 0.8)
+        glue_r[pos:pos + elen] += pop * rng.uniform(0.4, 0.8)
+    thud_c = ensure_stereo(0.28 * np.sin(2.0 * np.pi * 78.0 * tc) * np.exp(-18.0 * tc))
+    c_lr = fibers * 0.48 + np.column_stack((glue_l, glue_r)) * 0.45 + thud_c
+    c_lr = corridor_reverb(c_lr, sr, rt60=0.30, wet=0.18, bright_hz=1800.0, seed=66)
+    c_lr = fade_edges(c_lr, sr, fade_in_s=0.008, fade_out_s=0.07)
+    synth_ogg(c_lr, os.path.join(SND_DIR, "carpet_rip.ogg"), sr, drive=1.15, target_peak=0.45)
+
+    # 7. metal_pry.ogg (0.65s 48kHz genuine inharmonic thin sheet-steel HVAC vent pry & clatter)
+    dur_m = 0.65
+    nm = int(sr * dur_m)
+    tm = np.linspace(0.0, dur_m, nm, endpoint=False)
+    # Realistic inharmonic modes of a thin galvanized duct grate
+    modes = [
+        (312.0, 0.34, 7.5), (487.0, 0.42, 9.0), (691.0, 0.31, 11.0), (938.0, 0.25, 13.5),
+        (1214.0, 0.20, 15.0), (1582.0, 0.15, 17.5), (2045.0, 0.11, 20.0), (2610.0, 0.07, 23.0),
+    ]
+    metal_l = np.zeros(nm, dtype=np.float64)
+    metal_r = np.zeros(nm, dtype=np.float64)
+    for idx_m, (mf, ma, md) in enumerate(modes):
+        pan_l = 0.88 if (idx_m % 2 == 0) else 1.0
+        pan_r = 1.0 if (idx_m % 2 == 0) else 0.88
+        mode_sig = ma * np.sin(2.0 * np.pi * mf * tm + idx_m * 0.4) * np.exp(-md * tm)
+        metal_l += mode_sig * pan_l
+        metal_r += mode_sig * pan_r
+    scrape = fft_band(rng.normal(0.0, 1.0, (nm, 2)), sr, low_hz=1400.0, high_hz=5200.0, order=2.0) * np.exp(-26.0 * tm)[:, None]
+    impact = ensure_stereo(0.42 * np.sin(2.0 * np.pi * 135.0 * tm) * np.exp(-32.0 * tm))
+    m_lr = np.column_stack((metal_l, metal_r)) * 0.65 + scrape * 0.36 + impact
+    m_lr = corridor_reverb(m_lr, sr, rt60=0.45, wet=0.25, bright_hz=3000.0, seed=88)
+    m_lr = fade_edges(m_lr, sr, fade_in_s=0.004, fade_out_s=0.10)
+    synth_ogg(m_lr, os.path.join(SND_DIR, "metal_pry.ogg"), sr, drive=1.2, target_peak=0.48)
+
+    # 8. red_room_pulse.ogg (4.4s 48kHz warm dark subharmonic dread drone, crossfade-ready @ 3.8s)
+    dur_r = 4.4
+    nr = int(sr * dur_r)
+    tr = np.linspace(0.0, dur_r, nr, endpoint=False)
+    drone = (
+        0.34 * np.sin(2.0 * np.pi * 41.2 * tr)
+        + 0.22 * np.sin(2.0 * np.pi * 61.8 * tr)
+        + 0.14 * np.sin(2.0 * np.pi * 82.4 * tr)
+        + 0.08 * np.sin(2.0 * np.pi * 123.6 * tr)
+    )
+    breath = 0.72 + 0.28 * np.sin(2.0 * np.pi * 0.45 * tr - 0.5 * np.pi)
+    dark_air = fft_band(rng.normal(0.0, 1.0, (nr, 2)), sr, low_hz=45.0, high_hz=320.0, order=2.0)
+    dark_air = dark_air / (np.std(dark_air) + 1e-9) * 0.08
+    pulse_lr = np.column_stack((drone * breath, drone * 0.96 * breath)) + dark_air
+    pulse_lr = corridor_reverb(pulse_lr, sr, rt60=1.15, wet=0.40, bright_hz=580.0, seed=99)
+    pulse_lr = fade_edges(pulse_lr, sr, fade_in_s=0.65, fade_out_s=0.80, equal_power=True)
+    synth_ogg(pulse_lr, os.path.join(SND_DIR, "red_room_pulse.ogg"), sr, drive=1.12, target_peak=0.28)
 
     write_json(os.path.join(PACK_DIR, "assets", "minecraft", "sounds.json"), {
         "backrooms.ambient.hum": {

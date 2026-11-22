@@ -5,7 +5,7 @@
 resource-pack:
   enabled: true
   url: "https://mirror.yunexal.com/packs/YunexalBackrooms-RP.zip"
-  sha1: "b6f59acb38fc26a9921c3a9d975e648703942808"
+  sha1: "1ac5f313793aaa53aca8890cc83aed7f99e5ac42"
   required: true
   prompt: "&e&lYUNEXAL BACKROOMS\n&7Для входу на &fРівень 0 «Лобі» &7обов'язково прийміть ресурс-пак.\n&8Кастомні текстури, Манільська та Червона кімнати, 48kHz аудіо."
   timeout-seconds: 45
