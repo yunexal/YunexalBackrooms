@@ -152,6 +152,31 @@ public final class BackroomsEntityManager implements Listener {
         return tracked.size();
     }
 
+    public boolean isTrackedEntity(Entity e) {
+        return e != null && tracked.containsKey(e.getUniqueId());
+    }
+
+    public Zombie findNearestEntityHost(Location origin, double maxRange) {
+        World w = origin.getWorld();
+        if (w == null || tracked.isEmpty()) {
+            return null;
+        }
+        double bestDistSq = maxRange * maxRange;
+        Zombie best = null;
+        for (TrackedEntity te : tracked.values()) {
+            Zombie z = te.host;
+            if (!z.isValid() || z.isDead() || !z.getWorld().equals(w)) {
+                continue;
+            }
+            double dSq = z.getLocation().distanceSquared(origin);
+            if (dSq < bestDistSq) {
+                bestDistSq = dSq;
+                best = z;
+            }
+        }
+        return best;
+    }
+
     public int clearAll() {
         int removed = tracked.size();
         for (TrackedEntity te : tracked.values()) {

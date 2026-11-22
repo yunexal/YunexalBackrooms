@@ -133,8 +133,8 @@ public final class BackroomsConfig {
         this.level1CrateChancePerRegion = clamp01(cfg.getDouble("level1.crate-chance-per-region", 0.85));
         this.level1DynamicCrateIntervalSeconds = Math.max(10, cfg.getInt("level1.dynamic-crate-interval-seconds", 28));
         this.level1DynamicCrateLifetimeSeconds = Math.max(30, cfg.getInt("level1.dynamic-crate-lifetime-seconds", 180));
-        this.level1BlackoutIntervalSeconds = Math.max(45, cfg.getInt("level1.blackout-interval-seconds", 210));
-        this.level1BlackoutDurationSeconds = Math.max(15, cfg.getInt("level1.blackout-duration-seconds", 45));
+        this.level1BlackoutIntervalSeconds = Math.max(45, cfg.getInt("level1.blackout-interval-seconds", 720));
+        this.level1BlackoutDurationSeconds = Math.max(15, cfg.getInt("level1.blackout-duration-seconds", 40));
         this.level1BlackoutEntitySpawns = cfg.getBoolean("level1.blackout-entity-spawns", true);
         this.level1FogParticles = cfg.getBoolean("level1.fog-particles", true);
 

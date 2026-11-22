@@ -491,14 +491,14 @@ public final class Level1ChunkGenerator extends ChunkGenerator {
         }
         double roll = toUnitDouble(mix64(seed ^ 0x94D049BB133111EBL, cx, cz));
         if (zone == Level1ZoneType.STORAGE_CORRIDOR) {
-            if (roll < 0.16) return LightState.FLICKERING;
-            if (roll < 0.34) return LightState.DEAD;
-            if (roll < 0.46) return LightState.NONE;
+            if (roll < 0.14) return LightState.FLICKERING;
+            if (roll < 0.28) return LightState.DEAD;
+            if (roll < 0.36) return LightState.NONE;
             return LightState.WORKING;
         }
-        if (roll < 0.14) return LightState.FLICKERING;
-        if (roll < 0.26) return LightState.DEAD;
-        if (roll < 0.36) return LightState.NONE;
+        if (roll < 0.10) return LightState.FLICKERING;
+        if (roll < 0.18) return LightState.DEAD;
+        if (roll < 0.24) return LightState.NONE;
         return LightState.WORKING;
     }
 
@@ -539,6 +539,9 @@ public final class Level1ChunkGenerator extends ChunkGenerator {
     public @NotNull List<BlockPopulator> getDefaultPopulators(@NotNull World world) {
         return List.of(new Level1Populator(plugin));
     }
+
+    @Override
+    public boolean isParallelCapable() { return true; }
 
     @Override
     public boolean shouldGenerateNoise() { return false; }

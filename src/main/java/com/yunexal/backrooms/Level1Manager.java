@@ -3,6 +3,7 @@ package com.yunexal.backrooms;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -13,23 +14,32 @@ import org.bukkit.World;
 import org.bukkit.WorldBorder;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Barrel;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
+import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
+import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.MerchantRecipe;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -58,13 +68,28 @@ public final class Level1Manager implements Listener {
 
     private record DynamicCrate(int x, int y, int z, long expiresAtMs) {}
 
+    private static final class OutpostSoldier {
+        final String slotId;
+        final Zombie host;
+        final Location homeLoc;
+        long nextAttackAtMs;
+
+        OutpostSoldier(String slotId, Zombie host, Location homeLoc) {
+            this.slotId = slotId;
+            this.host = host;
+            this.homeLoc = homeLoc;
+        }
+    }
+
     private final YunexalBackroomsPlugin plugin;
     private final NamespacedKey crateKey;
     private final NamespacedKey dynamicCrateKey;
     private final NamespacedKey npcRoleKey;
+    private final NamespacedKey soldierSlotKey;
 
     private final List<DynamicCrate> dynamicCrates = new ArrayList<>();
     private final Map<UUID, Set<Location>> activeDimmedLamps = new ConcurrentHashMap<>();
+    private final Map<String, OutpostSoldier> outpostSoldiers = new ConcurrentHashMap<>();
 
     private World level1World;
     private BlackoutPhase blackoutPhase = BlackoutPhase.LIT;
@@ -73,12 +98,14 @@ public final class Level1Manager implements Listener {
 
     private BukkitTask mainTask;
     private BukkitTask ambientFogTask;
+    private BukkitTask soldierTask;
 
     public Level1Manager(YunexalBackroomsPlugin plugin) {
         this.plugin = plugin;
         this.crateKey = new NamespacedKey(plugin, "level1_crate");
         this.dynamicCrateKey = new NamespacedKey(plugin, "level1_dynamic_crate");
         this.npcRoleKey = new NamespacedKey(plugin, "level1_npc_role");
+        this.soldierSlotKey = new NamespacedKey(plugin, "level1_soldier_slot");
     }
 
     public World ensureLevel1World() {
@@ -133,11 +160,13 @@ public final class Level1Manager implements Listener {
     public void start() {
         shutdown();
         ensureLevel1World();
+        purgeOrphanSoldiers(getLevel1World());
         long now = System.currentTimeMillis();
         nextPhaseChangeMs = now + plugin.getBackroomsConfig().getLevel1BlackoutIntervalSeconds() * 1000L;
         lastCrateSpawnMs = now;
         mainTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickMain, 10L, 10L);
         ambientFogTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickFogAndPuddles, 15L, 15L);
+        soldierTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickSoldiers, 5L, 5L);
     }
 
     public void shutdown() {
@@ -149,6 +178,17 @@ public final class Level1Manager implements Listener {
             ambientFogTask.cancel();
             ambientFogTask = null;
         }
+        if (soldierTask != null) {
+            soldierTask.cancel();
+            soldierTask = null;
+        }
+        for (OutpostSoldier s : outpostSoldiers.values()) {
+            if (s.host.isValid()) {
+                s.host.remove();
+            }
+        }
+        outpostSoldiers.clear();
+        purgeOrphanSoldiers(getLevel1World());
         restoreAllDimmedLamps();
     }
 
@@ -438,12 +478,233 @@ public final class Level1Manager implements Listener {
 
     private void ensureOutpostNpcAtRegion(World l1, Level1ChunkGenerator.Level1ZoneType zone, int rx, int rz, Location npcLoc) {
         String expectedRole = zone.name();
+        boolean npcFound = false;
         for (Entity e : l1.getNearbyEntities(npcLoc, 8.0, 4.0, 8.0)) {
             if (e instanceof Villager v && expectedRole.equals(v.getPersistentDataContainer().get(npcRoleKey, PersistentDataType.STRING))) {
-                return;
+                npcFound = true;
+                break;
             }
         }
-        spawnOutpostNpc(npcLoc, zone);
+        if (!npcFound) {
+            spawnOutpostNpc(npcLoc, zone);
+        }
+        ensureOutpostSoldiersAtRegion(l1, zone, rx, rz);
+    }
+
+    private void ensureOutpostSoldiersAtRegion(World l1, Level1ChunkGenerator.Level1ZoneType zone, int rx, int rz) {
+        int floorY = plugin.getBackroomsConfig().getLevel1FloorY();
+        int bx = rx * 32;
+        int bz = rz * 32;
+        double y = floorY + 1.0;
+
+        List<Location> posts = switch (zone) {
+            case MEG_BASE_ALPHA -> List.of(
+                    new Location(l1, bx + 7.5, y, bz + 14.5, 90f, 0f),
+                    new Location(l1, bx + 24.5, y, bz + 14.5, -90f, 0f),
+                    new Location(l1, bx + 15.5, y, bz + 19.5, 0f, 0f)
+            );
+            case BNTG_TRADER_KEEP -> List.of(
+                    new Location(l1, bx + 7.5, y, bz + 14.5, 90f, 0f),
+                    new Location(l1, bx + 24.5, y, bz + 14.5, -90f, 0f)
+            );
+            case TOMS_DINER -> List.of(
+                    new Location(l1, bx + 7.5, y, bz + 14.5, 90f, 0f)
+            );
+            default -> List.of();
+        };
+
+        boolean bntgFaction = (zone == Level1ChunkGenerator.Level1ZoneType.BNTG_TRADER_KEEP);
+        for (int i = 0; i < posts.size(); i++) {
+            String slotId = rx + ":" + rz + ":" + i;
+            OutpostSoldier existing = outpostSoldiers.get(slotId);
+            if (existing != null && existing.host.isValid() && !existing.host.isDead()) {
+                continue;
+            }
+            Location post = posts.get(i);
+            if (!l1.isChunkLoaded(post.getBlockX() >> 4, post.getBlockZ() >> 4)) {
+                continue;
+            }
+            Zombie z = spawnSoldierEntity(post, slotId, bntgFaction);
+            outpostSoldiers.put(slotId, new OutpostSoldier(slotId, z, post.clone()));
+        }
+    }
+
+    private Zombie spawnSoldierEntity(Location loc, String slotId, boolean bntg) {
+        return loc.getWorld().spawn(loc, Zombie.class, z -> {
+            z.setAdult();
+            z.setSilent(true);
+            z.setShouldBurnInDay(false);
+            z.setCanBreakDoors(false);
+            z.setRemoveWhenFarAway(false);
+            z.setPersistent(false);
+            z.setInvulnerable(true);
+            var maxHp = z.getAttribute(Attribute.MAX_HEALTH);
+            if (maxHp != null) {
+                maxHp.setBaseValue(40.0);
+            }
+            z.setHealth(40.0);
+            var spd = z.getAttribute(Attribute.MOVEMENT_SPEED);
+            if (spd != null) {
+                spd.setBaseValue(0.28);
+            }
+
+            EntityEquipment eq = z.getEquipment();
+            if (eq != null) {
+                eq.clear();
+                ItemStack helmet = new ItemStack(Material.CARVED_PUMPKIN);
+                ItemMeta hm = helmet.getItemMeta();
+                hm.setItemModel(NamespacedKey.minecraft(bntg ? "bntg_soldier_helmet" : "meg_soldier_helmet"));
+                helmet.setItemMeta(hm);
+
+                Color kevlarCol = bntg ? Color.fromRGB(0x6E, 0x64, 0x34) : Color.fromRGB(0x24, 0x3E, 0x63);
+                ItemStack chest = new ItemStack(Material.LEATHER_CHESTPLATE);
+                if (chest.getItemMeta() instanceof LeatherArmorMeta cm) {
+                    cm.setColor(kevlarCol);
+                    chest.setItemMeta(cm);
+                }
+                ItemStack legs = new ItemStack(Material.LEATHER_LEGGINGS);
+                if (legs.getItemMeta() instanceof LeatherArmorMeta lm) {
+                    lm.setColor(bntg ? Color.fromRGB(0x4E, 0x4A, 0x32) : Color.fromRGB(0x20, 0x2B, 0x3C));
+                    legs.setItemMeta(lm);
+                }
+
+                eq.setHelmet(helmet);
+                eq.setChestplate(chest);
+                eq.setLeggings(legs);
+                eq.setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+                eq.setItemInMainHand(new ItemStack(Material.CROSSBOW));
+                eq.setHelmetDropChance(0.0f);
+                eq.setChestplateDropChance(0.0f);
+                eq.setLeggingsDropChance(0.0f);
+                eq.setBootsDropChance(0.0f);
+                eq.setItemInMainHandDropChance(0.0f);
+            }
+
+            z.customName(Component.text(
+                    bntg ? "Охоронець B.N.T.G." : "Боєць M.E.G.",
+                    bntg ? NamedTextColor.GOLD : NamedTextColor.AQUA
+            ));
+            z.setCustomNameVisible(true);
+            z.getPersistentDataContainer().set(soldierSlotKey, PersistentDataType.STRING, slotId);
+        });
+    }
+
+    private void tickSoldiers() {
+        World l1 = getLevel1World();
+        if (l1 == null || outpostSoldiers.isEmpty()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        BackroomsEntityManager em = plugin.getEntities();
+        Iterator<Map.Entry<String, OutpostSoldier>> it = outpostSoldiers.entrySet().iterator();
+
+        while (it.hasNext()) {
+            OutpostSoldier s = it.next().getValue();
+            Zombie z = s.host;
+            if (!z.isValid() || z.isDead()) {
+                it.remove();
+                continue;
+            }
+            z.setFireTicks(0);
+            z.setHealth(40.0);
+
+            Location sLoc = z.getLocation();
+            if (!l1.isChunkLoaded(sLoc.getBlockX() >> 4, sLoc.getBlockZ() >> 4)) {
+                continue;
+            }
+
+            Zombie target = em.findNearestEntityHost(sLoc, 28.0);
+            if (target != null && target.isValid() && !target.isDead()) {
+                Location tLoc = target.getLocation();
+                double dist = sLoc.distance(tLoc);
+                z.setTarget(target);
+
+                if (sLoc.distanceSquared(s.homeLoc) < 26.0 * 26.0 && dist > 2.2) {
+                    z.getPathfinder().moveTo(target, 1.35);
+                }
+
+                // Orient soldier toward entity
+                Vector look = tLoc.toVector().subtract(sLoc.toVector());
+                if (look.lengthSquared() > 1e-4) {
+                    Location facing = sLoc.clone().setDirection(look);
+                    z.setRotation(facing.getYaw(), facing.getPitch());
+                }
+
+                if (now >= s.nextAttackAtMs && z.hasLineOfSight(target)) {
+                    if (dist <= 2.7) {
+                        s.nextAttackAtMs = now + 650L;
+                        z.swingMainHand();
+                        l1.playSound(sLoc, Sound.ENTITY_PLAYER_ATTACK_STRONG, SoundCategory.HOSTILE, 0.7f, 1.15f);
+                        target.damage(10.0, z);
+                        Vector kb = look.clone().setY(0).normalize().multiply(0.38).setY(0.16);
+                        target.setVelocity(target.getVelocity().add(kb));
+                    } else if (dist <= 24.0) {
+                        s.nextAttackAtMs = now + 1000L;
+                        z.swingMainHand();
+                        Location muzzle = sLoc.clone().add(0.0, 1.45, 0.0);
+                        Location hitPos = tLoc.clone().add(0.0, 1.1, 0.0);
+                        Vector ray = hitPos.toVector().subtract(muzzle.toVector());
+                        double len = ray.length();
+                        if (len > 0.1) {
+                            Vector step = ray.clone().multiply(0.45 / len);
+                            int steps = Math.min(48, (int) (len / 0.45));
+                            Location cur = muzzle.clone();
+                            for (int i = 0; i < steps; i++) {
+                                cur.add(step);
+                                l1.spawnParticle(Particle.ELECTRIC_SPARK, cur, 1, 0.02, 0.02, 0.02, 0.0);
+                                if ((i & 1) == 0) {
+                                    l1.spawnParticle(Particle.SMOKE, cur, 1, 0.01, 0.01, 0.01, 0.0);
+                                }
+                            }
+                        }
+                        l1.playSound(muzzle, Sound.ENTITY_FIREWORK_ROCKET_BLAST, SoundCategory.NEUTRAL, 0.85f, 1.55f);
+                        target.damage(9.0, z);
+                    }
+                }
+            } else {
+                if (z.getTarget() != null) {
+                    z.setTarget(null);
+                }
+                if (sLoc.distanceSquared(s.homeLoc) > 2.5 * 2.5) {
+                    z.getPathfinder().moveTo(s.homeLoc, 1.0);
+                }
+            }
+        }
+    }
+
+    private void purgeOrphanSoldiers(World l1) {
+        if (l1 == null) {
+            return;
+        }
+        for (Entity e : l1.getEntities()) {
+            if (e.getPersistentDataContainer().has(soldierSlotKey, PersistentDataType.STRING)) {
+                e.remove();
+            }
+        }
+    }
+
+    @EventHandler
+    public void onSoldierTarget(EntityTargetLivingEntityEvent event) {
+        if (event.getEntity().getPersistentDataContainer().has(soldierSlotKey, PersistentDataType.STRING)) {
+            if (!plugin.getEntities().isTrackedEntity(event.getTarget())) {
+                event.setCancelled(true);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onSoldierCombust(EntityCombustEvent event) {
+        if (event.getEntity().getPersistentDataContainer().has(soldierSlotKey, PersistentDataType.STRING)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onSoldierDeath(EntityDeathEvent event) {
+        if (event.getEntity().getPersistentDataContainer().has(soldierSlotKey, PersistentDataType.STRING)) {
+            event.getDrops().clear();
+            event.setDroppedExp(0);
+        }
     }
 
     private void spawnOutpostNpc(Location loc, Level1ChunkGenerator.Level1ZoneType zone) {
@@ -505,7 +766,8 @@ public final class Level1Manager implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onNpcDamage(EntityDamageEvent event) {
-        if (event.getEntity().getPersistentDataContainer().has(npcRoleKey, PersistentDataType.STRING)) {
+        var pdc = event.getEntity().getPersistentDataContainer();
+        if (pdc.has(npcRoleKey, PersistentDataType.STRING) || pdc.has(soldierSlotKey, PersistentDataType.STRING)) {
             event.setCancelled(true);
         }
     }

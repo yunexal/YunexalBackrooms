@@ -5,7 +5,7 @@
 resource-pack:
   enabled: true
   url: "https://mirror.yunexal.com/packs/YunexalBackrooms-RP.zip"
-  sha1: "ada76a218c1eb0ec6260e4fae2b085129a254e10"
+  sha1: "a9e9bac3ae0d8831034927ae445d61e583d7c09a"
   required: true
   prompt: "&e&lYUNEXAL BACKROOMS\n&7Для входу на &fРівні 0 і 1 &7обов'язково прийміть ресурс-пак.\n&8Шпалери, бетонні склади, 48kHz аудіо та 3D сутності."
   timeout-seconds: 45
@@ -53,8 +53,8 @@ level1:
   crate-chance-per-region: 0.85
   dynamic-crate-interval-seconds: 28
   dynamic-crate-lifetime-seconds: 180
-  blackout-interval-seconds: 210
-  blackout-duration-seconds: 45
+  blackout-interval-seconds: 720
+  blackout-duration-seconds: 40
   blackout-entity-spawns: true
   fog-particles: true
 

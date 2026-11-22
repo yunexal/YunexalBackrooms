@@ -201,6 +201,36 @@ def make_uv_atlas_skinstealer(out_png):
     Image.fromarray(img, mode="RGBA").save(out_png)
 
 
+def make_uv_atlas_soldier_gear(out_png):
+    """64x64 tactical Kevlar helmet plates, matte black balaclava & glowing cyan/gold ballistic goggles."""
+    rng = np.random.default_rng(7606)
+    img = np.zeros((64, 64, 4), dtype=np.uint8)
+
+    # [0..32, 0..32]: Slate-navy M.E.G. PASGT ballistic helmet shell
+    for y in range(32):
+        for x in range(32):
+            v = int(np.clip(54 + rng.normal(0, 3.0), 38, 72))
+            img[y, x] = [v - 8, v, v + 22, 255]
+
+    # [32..64, 0..32]: Olive-khaki B.N.T.G. tactical helmet shell
+    for y in range(32):
+        for x in range(32, 64):
+            v = int(np.clip(92 + rng.normal(0, 3.0), 70, 114))
+            img[y, x] = [v + 12, v + 4, v - 26, 255]
+
+    # [0..32, 32..64]: Matte black tactical balaclava & respirator grille
+    for y in range(32, 64):
+        for x in range(32):
+            v = int(np.clip(22 + ((x + y) % 2) * 3 + rng.normal(0, 1.5), 14, 34))
+            img[y, x] = [v, v + 1, v + 3, 255]
+
+    # [32..64, 32..64]: Glowing cyan/amber ballistic visor goggles
+    img[32:48, 32:64] = [90, 210, 255, 255]
+    img[48:64, 32:64] = [255, 196, 72, 255]
+
+    Image.fromarray(img, mode="RGBA").save(out_png)
+
+
 def uv_box(u_px, v_px, w_px=32, h_px=32):
     """Maps a pixel sub-region in a 64x64 atlas to Minecraft 0..16 UV box dict."""
     u1 = round(u_px * 16.0 / 64.0, 3)
@@ -343,11 +373,13 @@ def generate_blockbench_entities(pack_dir, blockbench_src_dir):
     hound_png = os.path.join(item_tex_dir, "entity_hound.png")
     faceless_png = os.path.join(item_tex_dir, "entity_faceless.png")
     skin_png = os.path.join(item_tex_dir, "entity_skinstealer.png")
+    soldier_png = os.path.join(item_tex_dir, "entity_soldier_gear.png")
     make_uv_atlas_bacteria(bac_png)
     make_uv_atlas_smiler(smiler_png)
     make_uv_atlas_hound(hound_png)
     make_uv_atlas_faceless(faceless_png)
     make_uv_atlas_skinstealer(skin_png)
+    make_uv_atlas_soldier_gear(soldier_png)
 
     WIRE = (0, 0, 32, 32)
     RIB = (32, 0, 32, 32)
@@ -666,5 +698,35 @@ def generate_blockbench_entities(pack_dir, blockbench_src_dir):
     export_bbmodel(os.path.join(blockbench_src_dir, "hound.bbmodel"), "hound", "entity_hound.png", hound_png, hound_bones)
     export_bbmodel(os.path.join(blockbench_src_dir, "faceless.bbmodel"), "faceless", "entity_faceless.png", faceless_png, faceless_bones)
     export_bbmodel(os.path.join(blockbench_src_dir, "skinstealer.bbmodel"), "skinstealer", "entity_skinstealer.png", skin_png, skinstealer_bones)
+
+    # Tactical M.E.G. & B.N.T.G. soldier head gear models (covers head cleanly when worn in HEAD slot)
+    S_MEG = (0, 0, 32, 32)
+    S_BNTG = (32, 0, 32, 32)
+    S_MASK = (0, 32, 32, 32)
+    S_VISOR_C = (32, 32, 32, 16)
+    S_VISOR_A = (32, 48, 32, 16)
+    for key_name, shell, visor in (
+        ("meg_soldier_helmet", S_MEG, S_VISOR_C),
+        ("bntg_soldier_helmet", S_BNTG, S_VISOR_A),
+    ):
+        helmet_model = build_bone_model("minecraft:item/entity_soldier_gear", [
+            # Full black ballistic balaclava enclosing head
+            elem(2.2, 1.8, 2.2, 13.8, 13.6, 13.8, S_MASK),
+            # Heavy ballistic combat helmet shell & rim
+            elem(1.6, 8.2, 1.6, 14.4, 14.3, 14.4, shell),
+            elem(1.8, 7.2, 1.3, 14.2, 8.8, 3.0, shell),
+            # Tactical tinted visor goggles on North (-Z) face
+            elem(2.8, 6.2, 1.4, 13.2, 8.4, 2.5, visor),
+        ])
+        helmet_model["display"]["head"] = {
+            "rotation": [0, 0, 0],
+            "translation": [0, 0, 0],
+            "scale": [1.06, 1.06, 1.06],
+        }
+        write_json(os.path.join(item_model_dir, f"{key_name}.json"), helmet_model)
+        write_json(os.path.join(item_def_dir, f"{key_name}.json"), {
+            "model": {"type": "minecraft:model", "model": f"minecraft:item/entity/{key_name}"}
+        })
+
     total_bones = len(bacteria_bones) + len(smiler_bones) + len(hound_bones) + len(faceless_bones) + len(skinstealer_bones)
-    print(f"Generated 5 Blockbench projects + {total_bones} JSON bone models.")
+    print(f"Generated 5 Blockbench projects + {total_bones} JSON bone models + 2 tactical helmets.")
