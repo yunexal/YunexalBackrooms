@@ -282,7 +282,7 @@ public final class LimboManager implements Listener {
 
         player.removePotionEffect(PotionEffectType.BLINDNESS);
         player.removePotionEffect(PotionEffectType.DARKNESS);
-        player.setGameMode(GameMode.ADVENTURE);
+        player.setGameMode(GameMode.SURVIVAL);
         player.setHealth(20.0);
         player.setFoodLevel(20);
         player.setSaturation(20.0f);
@@ -313,9 +313,9 @@ public final class LimboManager implements Listener {
         ));
         if (firstEntry) {
             player.sendMessage(Component.text("▸ ", NamedTextColor.YELLOW)
-                    .append(Component.text("Ви провалилися крізь реальність на ", NamedTextColor.GRAY))
-                    .append(Component.text("Рівень 0 «Лобі»", NamedTextColor.GOLD))
-                    .append(Component.text(". Крафти: ", NamedTextColor.GRAY))
+                    .append(Component.text("Ви провалилися у ", NamedTextColor.GRAY))
+                    .append(Component.text("Рівень 0 «Лобі» (Виживання)", NamedTextColor.GOLD))
+                    .append(Component.text(". Здирайте ковролін і шпалери, облаштовуйте базу — інші побачать ваші сліди. Крафти: ", NamedTextColor.GRAY))
                     .append(Component.text("/br craft", NamedTextColor.YELLOW))
                     .append(Component.text(" | Хаб: ", NamedTextColor.GRAY))
                     .append(Component.text("/br hub", NamedTextColor.AQUA)));

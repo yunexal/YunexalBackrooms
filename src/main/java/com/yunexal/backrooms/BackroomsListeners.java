@@ -5,6 +5,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -39,6 +40,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
 import java.time.Duration;
 import java.util.Map;
@@ -48,7 +50,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Handles canonical Level 0 gameplay: entity-attached ambient hum & lamp-anchored flicker,
- * Red Room dread, soft-carpet noclip, rare non-linear space shifts, Adventure scavenging,
+ * Red Room dread, soft-carpet noclip, rare non-linear space shifts, Survival building & scavenging,
  * flashlight light projection, and privacy without scoreboards or coordinates.
  */
 public final class BackroomsListeners implements Listener {
@@ -147,8 +149,37 @@ public final class BackroomsListeners implements Listener {
 
             UUID uid = player.getUniqueId();
             Location loc = player.getLocation();
+            int floorY = cfg.getFloorY();
+            GameMode gm = player.getGameMode();
+            boolean survivalOrAdventure = (gm == GameMode.SURVIVAL || gm == GameMode.ADVENTURE);
+
+            // Pitfall deep-shaft abyss darkness & unsurvivable fall
+            if (survivalOrAdventure && !player.isDead() && loc.getY() <= floorY - 3.0) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 90, 0, false, false, false));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 90, 0, false, false, false));
+                if (loc.getY() <= floorY - 40.0) {
+                    player.setHealth(0.0);
+                    continue;
+                }
+            }
+
             Level0ChunkGenerator.ZoneType zone = plugin.getLevel0Generator()
                     .getZoneAtBlock(level0, loc.getBlockX(), loc.getBlockZ());
+
+            // Exhausted / dehydrated explorers stumble & suffer vertigo inside Pitfall Halls
+            if (zone == Level0ChunkGenerator.ZoneType.PITFALL_HALL && survivalOrAdventure && loc.getY() >= floorY - 1.5) {
+                double fatigue = plugin.getHallucinations() != null ? plugin.getHallucinations().getFatigue(player) : 0.0;
+                if (player.getFoodLevel() <= 10 || fatigue >= 0.45) {
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.NAUSEA, 110, 0, false, false, false));
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 45, 0, false, false, false));
+                    player.sendActionBar(Component.text("Паморочиться в голові через втому чи спрагу — не підходьте до ям!", NamedTextColor.RED));
+                    if ((player.isSprinting() || rng.nextDouble() < 0.25) && rng.nextDouble() < 0.42) {
+                        double ang = rng.nextDouble() * Math.PI * 2.0;
+                        double push = player.isSprinting() ? 0.24 : 0.16;
+                        player.setVelocity(player.getVelocity().add(new Vector(Math.cos(ang) * push, 0.02, Math.sin(ang) * push)));
+                    }
+                }
+            }
 
             if (zone == Level0ChunkGenerator.ZoneType.RED_ROOM) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 85, 0, false, false, false));
@@ -282,14 +313,23 @@ public final class BackroomsListeners implements Listener {
 
         Location to = event.getTo();
         Location from = event.getFrom();
+        BackroomsConfig cfg = plugin.getBackroomsConfig();
+        int floorY = cfg.getFloorY();
+        GameMode gm = player.getGameMode();
+        if ((gm == GameMode.SURVIVAL || gm == GameMode.ADVENTURE) && !player.isDead() && to.getY() <= floorY - 3.0) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 90, 0, false, false, false));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 90, 0, false, false, false));
+            if (to.getY() <= floorY - 40.0) {
+                player.setHealth(0.0);
+                return;
+            }
+        }
         if (from.getBlockX() == to.getBlockX() && from.getBlockZ() == to.getBlockZ()) {
             return;
         }
 
-        BackroomsConfig cfg = plugin.getBackroomsConfig();
         long now = System.currentTimeMillis();
         UUID uid = player.getUniqueId();
-        int floorY = cfg.getFloorY();
         int bx = to.getBlockX();
         int bz = to.getBlockZ();
 
@@ -397,7 +437,7 @@ public final class BackroomsListeners implements Listener {
 
         // 1. Usable custom survival items on right-click
         if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
-            if (BackroomsItems.ID_WORKBENCH.equals(heldId)) {
+            if (BackroomsItems.ID_WORKBENCH.equals(heldId) && action == Action.RIGHT_CLICK_AIR) {
                 event.setCancelled(true);
                 player.openWorkbench(null, true);
                 return;
@@ -416,7 +456,7 @@ public final class BackroomsListeners implements Listener {
                 player.sendActionBar(Component.text("Стрілка хаотично обертається — магнітного поля немає.", NamedTextColor.GRAY));
             }
             if (player.isSneaking() && action == Action.RIGHT_CLICK_BLOCK && clicked != null
-                    && clicked.getType() == Material.BROWN_WOOL) {
+                    && held.getType().isAir() && clicked.getType() == Material.BROWN_WOOL) {
                 event.setCancelled(true);
                 applyCarpetLiquidToxicity(player, "Ви ковтнули каламутну рідину з вологого килиму!");
                 return;
@@ -431,7 +471,7 @@ public final class BackroomsListeners implements Listener {
 
         // Dead 1980s North American electrical wall outlet (non-functional on Level 0)
         if (clicked != null && clicked.getType() == Material.CYAN_TERRACOTTA
-                && (action == Action.LEFT_CLICK_BLOCK || action == Action.RIGHT_CLICK_BLOCK)) {
+                && action == Action.RIGHT_CLICK_BLOCK && (held.getType().isAir() || BackroomsItems.ID_CROWBAR.equals(heldId))) {
             long now = System.currentTimeMillis();
             UUID uid = player.getUniqueId();
             if (now - lastInteractAtMs.getOrDefault(uid, 0L) >= 280L) {
@@ -443,8 +483,11 @@ public final class BackroomsListeners implements Listener {
             return;
         }
 
-        // 2. Scavenging Level 0 materials & picking up markers in Adventure mode
-        if (clicked == null || (action != Action.LEFT_CLICK_BLOCK && action != Action.RIGHT_CLICK_BLOCK)) {
+        // 2. Non-destructive surface scavenging on right-click ONLY with empty hand or crowbar (so Survival mining & block placement work naturally)
+        if (clicked == null || action != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+        if (!held.getType().isAir() && !BackroomsItems.ID_CROWBAR.equals(heldId)) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -543,7 +586,7 @@ public final class BackroomsListeners implements Listener {
 
     private boolean tryPlaceMarker(Player player, Block floor, ItemStack held) {
         Material m = floor.getType();
-        if (m != Material.BROWN_WOOL && m != Material.GRAY_WOOL && m != Material.RED_WOOL) {
+        if (m != Material.BROWN_WOOL && m != Material.GRAY_WOOL && m != Material.RED_WOOL && m != Material.GRAY_CONCRETE) {
             return false;
         }
         Block above = floor.getRelative(BlockFace.UP);
@@ -603,10 +646,8 @@ public final class BackroomsListeners implements Listener {
                 return true;
             }
             case BROWN_WOOL -> {
-                block.setType(Material.GRAY_WOOL, false);
-                giveOrDrop(player, items.carpetFiber(1 + rng.nextInt(2)), soundLoc);
-                player.playSound(soundLoc, "minecraft:backrooms.fx.carpet_rip", SoundCategory.BLOCKS, 0.7f, 0.95f + rng.nextFloat() * 0.1f);
-                return true;
+                // In Survival, players tear off carpet by breaking it (revealing concrete underneath)
+                return false;
             }
             case IRON_BLOCK -> {
                 BlockKey key = new BlockKey(block.getWorld().getUID(), block.getX(), block.getY(), block.getZ());
@@ -664,15 +705,103 @@ public final class BackroomsListeners implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        if (!event.getPlayer().hasPermission("yunexal.backrooms.admin")) {
+        Player player = event.getPlayer();
+        if (player.hasPermission("yunexal.backrooms.admin")) {
+            return;
+        }
+        if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
             event.setCancelled(true);
+            return;
+        }
+        World level0 = plugin.getLevel0World();
+        Block block = event.getBlock();
+        if (level0 == null || !block.getWorld().equals(level0)) {
+            event.setCancelled(true);
+            return;
+        }
+        BackroomsConfig cfg = plugin.getBackroomsConfig();
+        int ceilingY = cfg.getFloorY() + cfg.getWallHeight() + 1;
+        if (block.getType() == Material.BEDROCK || block.getY() >= ceilingY) {
+            event.setCancelled(true);
+            return;
+        }
+
+        BackroomsItems items = plugin.getItems();
+        Material type = block.getType();
+        Location dropLoc = block.getLocation().add(0.5, 0.5, 0.5);
+        ItemStack held = player.getInventory().getItemInMainHand();
+        ThreadLocalRandom rng = ThreadLocalRandom.current();
+
+        if (type == Material.CRAFTING_TABLE) {
+            event.setDropItems(false);
+            block.getWorld().dropItemNaturally(dropLoc, items.workbench(1));
+            return;
+        }
+        if (type == Material.YELLOW_CANDLE) {
+            event.setDropItems(false);
+            block.getWorld().dropItemNaturally(dropLoc, items.marker(1));
+            return;
+        }
+        if (type == Material.BROWN_WOOL || type == Material.RED_WOOL || type == Material.GRAY_WOOL) {
+            block.getWorld().playSound(dropLoc, "minecraft:backrooms.fx.carpet_rip", SoundCategory.BLOCKS, 0.7f, 0.95f + rng.nextFloat() * 0.1f);
+            return;
+        }
+
+        // When breaking walls/vents without a pickaxe, yield Backrooms scavenging scrap so Survival progression works smoothly
+        if (block.getDrops(held, player).isEmpty()) {
+            switch (type) {
+                case YELLOW_TERRACOTTA, WHITE_TERRACOTTA, RED_TERRACOTTA -> {
+                    block.getWorld().dropItemNaturally(dropLoc, items.wallpaperScrap(1));
+                    block.getWorld().playSound(dropLoc, "minecraft:backrooms.fx.wallpaper_tear", SoundCategory.BLOCKS, 0.7f, 0.95f + rng.nextFloat() * 0.15f);
+                }
+                case ORANGE_TERRACOTTA -> {
+                    block.getWorld().dropItemNaturally(dropLoc, items.baseboardPlank(1));
+                    block.getWorld().playSound(dropLoc, "minecraft:backrooms.fx.wallpaper_tear", SoundCategory.BLOCKS, 0.75f, 0.85f + rng.nextFloat() * 0.1f);
+                }
+                case BROWN_TERRACOTTA -> {
+                    block.getWorld().dropItemNaturally(dropLoc, items.dampWallpaper(1));
+                    block.getWorld().playSound(dropLoc, "minecraft:backrooms.fx.wallpaper_tear", SoundCategory.BLOCKS, 0.65f, 0.75f);
+                }
+                case IRON_BLOCK -> {
+                    block.getWorld().dropItemNaturally(dropLoc, items.metalPlate(1));
+                    block.getWorld().playSound(dropLoc, "minecraft:backrooms.fx.metal_pry", SoundCategory.BLOCKS, 0.65f, 0.95f);
+                }
+                default -> { }
+            }
         }
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
-        if (!event.getPlayer().hasPermission("yunexal.backrooms.admin")) {
+        Player player = event.getPlayer();
+        if (player.hasPermission("yunexal.backrooms.admin")) {
+            return;
+        }
+        if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
             event.setCancelled(true);
+            return;
+        }
+        World level0 = plugin.getLevel0World();
+        Block block = event.getBlock();
+        if (level0 == null || !block.getWorld().equals(level0)) {
+            event.setCancelled(true);
+            return;
+        }
+        BackroomsConfig cfg = plugin.getBackroomsConfig();
+        int ceilingY = cfg.getFloorY() + cfg.getWallHeight() + 1;
+        if (block.getY() >= ceilingY || block.getY() < cfg.getFloorY() - 1) {
+            event.setCancelled(true);
+            return;
+        }
+        if (plugin.getItems().isItem(event.getItemInHand(), BackroomsItems.ID_FLASHLIGHT)) {
+            event.setCancelled(true);
+            player.sendActionBar(Component.text("Ліхтар світить лише в руках — не ставте його на землю.", NamedTextColor.YELLOW));
+            return;
+        }
+        if (block.getType() == Material.BARREL && block.getState() instanceof Barrel barrel) {
+            barrel.getPersistentDataContainer().set(manilaStockedKey, PersistentDataType.BYTE, (byte) 1);
+            barrel.getPersistentDataContainer().set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
+            barrel.update(true, false);
         }
     }
 

@@ -3,6 +3,7 @@ package com.yunexal.backrooms;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Keyed;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -30,6 +31,11 @@ public final class CraftingManager implements Listener {
     private final NamespacedKey keyMarker;
     private final NamespacedKey keyDryWallpaper;
     private final NamespacedKey keyBrokenCompass;
+    private final NamespacedKey keyWoolFiber;
+    private final NamespacedKey keyRedWoolFiber;
+    private final NamespacedKey keyBarrel;
+    private final NamespacedKey keyTorch;
+    private final NamespacedKey keyLadder;
 
     public CraftingManager(YunexalBackroomsPlugin plugin, BackroomsItems items) {
         this.plugin = plugin;
@@ -41,6 +47,11 @@ public final class CraftingManager implements Listener {
         this.keyMarker = new NamespacedKey(plugin, "recipe_marker");
         this.keyDryWallpaper = new NamespacedKey(plugin, "recipe_dry_wallpaper");
         this.keyBrokenCompass = new NamespacedKey(plugin, "recipe_broken_compass");
+        this.keyWoolFiber = new NamespacedKey(plugin, "recipe_wool_fiber");
+        this.keyRedWoolFiber = new NamespacedKey(plugin, "recipe_red_wool_fiber");
+        this.keyBarrel = new NamespacedKey(plugin, "recipe_barrel");
+        this.keyTorch = new NamespacedKey(plugin, "recipe_torch");
+        this.keyLadder = new NamespacedKey(plugin, "recipe_ladder");
     }
 
     public void registerRecipes() {
@@ -102,11 +113,41 @@ public final class CraftingManager implements Listener {
         bc.setIngredient('W', wire);
         bc.setIngredient('S', shard);
         Bukkit.addRecipe(bc);
+
+        // 8. Unravel torn carpet (BROWN_WOOL / RED_WOOL) into carpet fiber (2x2)
+        ShapelessRecipe wf = new ShapelessRecipe(keyWoolFiber, items.carpetFiber(2));
+        wf.addIngredient(Material.BROWN_WOOL);
+        Bukkit.addRecipe(wf);
+
+        ShapelessRecipe rwf = new ShapelessRecipe(keyRedWoolFiber, items.carpetFiber(2));
+        rwf.addIngredient(Material.RED_WOOL);
+        Bukkit.addRecipe(rwf);
+
+        // 9. Supply Barrel for player bases (3x3: 6 baseboard planks + 2 metal plates)
+        ShapedRecipe br = new ShapedRecipe(keyBarrel, new ItemStack(Material.BARREL, 1));
+        br.shape("PMP", "P P", "PMP");
+        br.setIngredient('P', plank);
+        br.setIngredient('M', plate);
+        Bukkit.addRecipe(br);
+
+        // 10. Base Wall Torch (2x2: lamp shard over baseboard plank -> 2x Torch)
+        ShapedRecipe tc = new ShapedRecipe(keyTorch, new ItemStack(Material.TORCH, 2));
+        tc.shape("S", "P");
+        tc.setIngredient('S', shard);
+        tc.setIngredient('P', plank);
+        Bukkit.addRecipe(tc);
+
+        // 11. Maintenance Ladder (3x3: 7 baseboard planks)
+        ShapedRecipe ld = new ShapedRecipe(keyLadder, new ItemStack(Material.LADDER, 2));
+        ld.shape("P P", "PPP", "P P");
+        ld.setIngredient('P', plank);
+        Bukkit.addRecipe(ld);
     }
 
     private void removeExisting() {
         for (NamespacedKey key : new NamespacedKey[]{
-                keyWorkbench, keyBandage, keyCrowbar, keyFlashlight, keyMarker, keyDryWallpaper, keyBrokenCompass
+                keyWorkbench, keyBandage, keyCrowbar, keyFlashlight, keyMarker, keyDryWallpaper, keyBrokenCompass,
+                keyWoolFiber, keyRedWoolFiber, keyBarrel, keyTorch, keyLadder
         }) {
             Bukkit.removeRecipe(key);
         }
@@ -124,22 +165,13 @@ public final class CraftingManager implements Listener {
             return;
         }
 
-        // Prevent vanilla Paper/String/Stick from accidentally crafting vanilla sticks/candles/torches in Backrooms
-        String resultCustomId = items.getItemId(result);
-        if (resultCustomId == null) {
-            for (ItemStack mat : inv.getMatrix()) {
-                if (items.getItemId(mat) != null) {
-                    inv.setResult(new ItemStack(Material.AIR));
-                    return;
-                }
-            }
+        if (recipe instanceof Keyed keyed && keyed.getKey().getNamespace().equalsIgnoreCase(plugin.getName())) {
             return;
         }
 
-        // Verify every non-empty slot actually carries a Backrooms custom ingredient (ExactChoice already checks meta,
-        // but this guarantees zero bypasses).
+        // Prevent Backrooms custom PDC ingredients from accidentally crafting vanilla sticks/candles/bows
         for (ItemStack mat : inv.getMatrix()) {
-            if (mat != null && !mat.getType().isAir() && items.getItemId(mat) == null) {
+            if (items.getItemId(mat) != null) {
                 inv.setResult(new ItemStack(Material.AIR));
                 return;
             }
@@ -162,5 +194,11 @@ public final class CraftingManager implements Listener {
                 .append(Component.text("Вологі шпалери + Сухі шпалери → 2× Шматки шпалер", NamedTextColor.WHITE)));
         player.sendMessage(Component.text("▸ Аномальний компас (верстак 3x3): ", NamedTextColor.AQUA)
                 .append(Component.text("4× Пластини навколо Дроту + Уламок лампи знизу", NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("▸ Розпустити ковролін (2x2): ", NamedTextColor.GRAY)
+                .append(Component.text("1× Здертий килим → 2× Волокна килиму", NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("▸ Сховок-бочка (верстак 3x3): ", NamedTextColor.GOLD)
+                .append(Component.text("6× Рейок плінтуса + 2× Бляшані пластини (верх/низ)", NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("▸ Смолоскип ×2 / Драбина ×2: ", NamedTextColor.YELLOW)
+                .append(Component.text("Уламок над Рейкою / 7× Рейок буквою H", NamedTextColor.WHITE)));
     }
 }

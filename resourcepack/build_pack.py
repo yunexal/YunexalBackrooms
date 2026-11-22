@@ -41,7 +41,7 @@ def save_png(arr, name):
     img.save(os.path.join(TEX_DIR, name))
 
 
-def make_wallpaper_base(seed=42, dark_shift=0):
+def make_wallpaper_base(seed=42, dark_shift=0, border=True):
     rng = np.random.default_rng(seed)
     # Mono-yellow sickly Backrooms wallpaper (#D8C572)
     base = np.zeros((32, 32, 3), dtype=np.float32)
@@ -67,9 +67,10 @@ def make_wallpaper_base(seed=42, dark_shift=0):
             if mx == 4 and my in (5, 6):
                 base[y, x] -= [8, 8, 6]
 
-    # Subtle ceiling-shadow top border
-    base[0, :] -= [14, 14, 12]
-    base[1, :] -= [6, 6, 5]
+    if border:
+        # Subtle ceiling-shadow top border
+        base[0, :] -= [14, 14, 12]
+        base[1, :] -= [6, 6, 5]
     return base
 
 
@@ -323,7 +324,39 @@ def generate_textures():
         hnd[hy:hy + 2, hx:hx + 3] -= [18, 18, 17]
     save_png(hnd, "gray_glazed_terracotta.png")
 
-    # 20. Smiler & Hound Custom Item Display Sprites (1.21.4+ / 26.3 items/ + models/item/ + textures/item/)
+    # 20. Seamless Arched Partition Wallpaper (smooth_sandstone, sandstone_top, sandstone_bottom)
+    arch_wp = make_wallpaper_base(seed=101, dark_shift=0, border=False)
+    save_png(arch_wp, "smooth_sandstone.png")
+    save_png(arch_wp, "sandstone_top.png")
+    save_png(arch_wp, "sandstone_bottom.png")
+
+    # 21. Screeded Concrete Subfloor & Dried Carpet Adhesive Under Ripped Carpet (gray_concrete.png)
+    rng_c = np.random.default_rng(1717)
+    conc = np.zeros((32, 32, 3), dtype=np.float32)
+    conc[:, :] = [114, 114, 110]
+    conc += rng_c.normal(0, 6.2, (32, 32, 1))
+    # Expansion control joint across concrete slab
+    conc[15:17, :] -= [16, 16, 15]
+    # Dried amber-tan carpet glue streaks left after tearing off soggy carpet
+    for _ in range(18):
+        gx, gy = rng_c.integers(1, 29, size=2)
+        conc[gy : gy + 2, gx : gx + 3] = [138, 122, 82] + rng_c.normal(0, 5.0, 3)
+    save_png(conc, "gray_concrete.png")
+
+    # 22. Industrial Galvanized Maintenance Ladder (ladder.png with alpha transparency)
+    lad = np.zeros((32, 32, 4), dtype=np.uint8)
+    for rail_x in (4, 5, 6, 25, 26, 27):
+        col = [152, 156, 158, 255] if rail_x in (5, 26) else [104, 108, 110, 255]
+        lad[:, rail_x] = col
+    for rung_y in (3, 11, 19, 27):
+        lad[rung_y, 6:26] = [174, 178, 180, 255]
+        lad[rung_y + 1, 6:26] = [132, 136, 138, 255]
+        lad[rung_y + 2, 6:26] = [84, 88, 90, 255]
+        for gx in range(8, 25, 3):
+            lad[rung_y, gx] = [120, 124, 126, 255]
+    save_png(lad, "ladder.png")
+
+    # 23. Smiler & Hound Custom Item Display Sprites (1.21.4+ / 26.3 items/ + models/item/ + textures/item/)
     item_tex_dir = os.path.join(PACK_DIR, "assets", "minecraft", "textures", "item")
     item_model_dir = os.path.join(PACK_DIR, "assets", "minecraft", "models", "item")
     item_def_dir = os.path.join(PACK_DIR, "assets", "minecraft", "items")
@@ -849,7 +882,7 @@ def main():
         "pack": {
             "min_format": 97,
             "max_format": 120,
-            "description": "YUNEXAL BACKROOMS // Level 0 Textures & Audio (26.3)",
+            "description": "YUNEXAL BACKROOMS // Level 0 Survival, Textures & 48kHz Audio (26.3)",
         }
     })
 

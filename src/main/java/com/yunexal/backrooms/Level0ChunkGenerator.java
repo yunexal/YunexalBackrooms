@@ -126,22 +126,37 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
                 int rlz = Math.floorMod(cz, REGION_CELLS);
                 boolean pitfallHallInterior = (zone == ZoneType.PITFALL_HALL
                         && rlx >= 1 && rlx <= 6 && rlz >= 1 && rlz <= 6);
-                boolean pitfallShaft = pitfallHallInterior
-                        && rlx >= 2 && rlx <= 5 && rlz >= 2 && rlz <= 5
-                        && (inCellX == 1 || inCellX == 2) && (inCellZ == 1 || inCellZ == 2);
+                boolean pitfallShaft = false;
+                if (pitfallHallInterior && rlx >= 2 && rlx <= 5 && rlz >= 2 && rlz <= 5) {
+                    int rx = Math.floorDiv(cx, REGION_CELLS);
+                    int rz = Math.floorDiv(cz, REGION_CELLS);
+                    boolean denseCluster = toUnitDouble(mix64(seed ^ 0x5E5E5E5E1234ABCDL, rx, rz)) < 0.40;
+                    if (denseCluster) {
+                        // Tight 3x3 pitch-black shafts separated only by 1-block carpet catwalks
+                        pitfallShaft = (inCellX >= 1 && inCellZ >= 1);
+                    } else {
+                        // Classic 2x2 pitfall grid with 2-block carpeted walkways between holes
+                        pitfallShaft = (inCellX == 1 || inCellX == 2) && (inCellZ == 1 || inCellZ == 2);
+                    }
+                }
 
-                // 1. Subfloor & roof bedrock seal (or Pitfall Hall under-floor crawlspace & shafts).
+                // 1. Subfloor & roof bedrock seal (or deep 64-block pitch-black Pitfall shafts).
                 if (pitfallHallInterior) {
-                    chunkData.setBlock(lx, floorY - 11, lz, Material.BEDROCK);
-                    chunkData.setBlock(lx, floorY - 10, lz, Material.BLACK_CONCRETE);
-                    for (int y = floorY - 6; y <= floorY - 1; y++) {
-                        if (!pitfallShaft) {
-                            chunkData.setBlock(lx, y, lz, Material.BROWN_TERRACOTTA);
+                    chunkData.setBlock(lx, -2, lz, Material.BEDROCK);
+                    chunkData.setBlock(lx, -1, lz, Material.BEDROCK);
+                    chunkData.setBlock(lx, 0, lz, Material.BLACK_CONCRETE);
+                    if (!pitfallShaft) {
+                        for (int y = 1; y <= floorY - 4; y++) {
+                            chunkData.setBlock(lx, y, lz, Material.BLACK_CONCRETE);
                         }
+                        chunkData.setBlock(lx, floorY - 3, lz, Material.BROWN_TERRACOTTA);
+                        chunkData.setBlock(lx, floorY - 2, lz, Material.BROWN_TERRACOTTA);
+                        chunkData.setBlock(lx, floorY - 1, lz, Material.GRAY_CONCRETE);
                     }
                 } else {
+                    chunkData.setBlock(lx, floorY - 3, lz, Material.BEDROCK);
                     chunkData.setBlock(lx, floorY - 2, lz, Material.BEDROCK);
-                    chunkData.setBlock(lx, floorY - 1, lz, Material.BEDROCK);
+                    chunkData.setBlock(lx, floorY - 1, lz, Material.GRAY_CONCRETE);
                 }
                 chunkData.setBlock(lx, ceilingY + 1, lz, Material.BEDROCK);
                 chunkData.setBlock(lx, ceilingY + 2, lz, Material.BEDROCK);
@@ -604,7 +619,7 @@ public final class Level0ChunkGenerator extends ChunkGenerator {
         if (roll < acc) {
             return ZoneType.RED_ROOM;
         }
-        acc += 0.055;
+        acc += 0.075;
         if (roll < acc) {
             return ZoneType.PITFALL_HALL;
         }

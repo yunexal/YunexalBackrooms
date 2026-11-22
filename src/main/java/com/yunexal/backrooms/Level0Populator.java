@@ -3,9 +3,7 @@ package com.yunexal.backrooms;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Barrel;
-import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
-import org.bukkit.block.data.type.Ladder;
 import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.LimitedRegion;
 import org.bukkit.generator.WorldInfo;
@@ -45,22 +43,6 @@ public final class Level0Populator extends BlockPopulator {
         long seed = cfg.getLevel0Seed() != 0L ? cfg.getLevel0Seed() : worldInfo.getSeed();
 
         Level0ChunkGenerator.ZoneType zone = generator.getZoneAtRegion(seed, rx, rz);
-        if (zone == Level0ChunkGenerator.ZoneType.PITFALL_HALL) {
-            int baseX = rx * 32;
-            int baseZ = rz * 32;
-            int floorY = cfg.getFloorY();
-            // Maintenance ladder shaft in the (1,1) corner walkway so players who fall into a pit can climb back out
-            int lx = baseX + 5;
-            int lz = baseZ + 5;
-            for (int y = floorY - 9; y <= floorY; y++) {
-                limitedRegion.setType(lx, y, lz, Material.LADDER);
-                if (limitedRegion.getBlockData(lx, y, lz) instanceof Ladder ladder) {
-                    ladder.setFacing(BlockFace.EAST);
-                    limitedRegion.setBlockData(lx, y, lz, ladder);
-                }
-            }
-            return;
-        }
         if (zone != Level0ChunkGenerator.ZoneType.MANILA_ROOM) {
             return;
         }
