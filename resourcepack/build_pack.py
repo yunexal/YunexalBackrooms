@@ -1004,6 +1004,12 @@ def main():
     generate_blockbench_entities(PACK_DIR, os.path.join(ROOT, "blockbench"))
     generate_audio()
 
+    # Merge BodycamFX 26.3 core shaders, lens overlay, and HUD bitmap font if present
+    bodycam_assets = os.path.abspath(os.path.join(ROOT, "..", "..", "BodycamFX", "resourcepack", "pack", "assets"))
+    if os.path.isdir(bodycam_assets):
+        shutil.copytree(bodycam_assets, os.path.join(PACK_DIR, "assets"), dirs_exist_ok=True)
+        print(f"Merged BodycamFX optical shader & HUD assets from {bodycam_assets}")
+
     with zipfile.ZipFile(DIST_ZIP, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for base, _, files in os.walk(PACK_DIR):
             for fn in sorted(files):

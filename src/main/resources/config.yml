@@ -5,7 +5,7 @@
 resource-pack:
   enabled: true
   url: "https://mirror.yunexal.com/packs/YunexalBackrooms-RP.zip"
-  sha1: "20c6a41abb03cfdcce27903ce0151029d2309a86"
+  sha1: "19cf1bfb9f25b180b94c8a06209a29d53cdc4635"
   required: true
   prompt: "&e&lYUNEXAL BACKROOMS\n&7Для входу на &fРівні 0, 1 та 2 &7обов'язково прийміть ресурс-пак.\n&8Шпалери, склади, тунелі труб, 48kHz аудіо та 3D сутності."
   timeout-seconds: 45
@@ -76,7 +76,8 @@ ambient:
   distant-thump-chance: 0.015
 
 bodycam:
-  enabled: true
+  # Disabled in YunexalBackrooms because standalone BodycamFX handles shaders, HUD & relative recoil
+  enabled: false
   intensity: 1.0
 
 entities:
