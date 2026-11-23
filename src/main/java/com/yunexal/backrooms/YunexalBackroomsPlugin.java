@@ -17,9 +17,11 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
     private CraftingManager craftingManager;
     private Level0ChunkGenerator level0Generator;
     private Level1ChunkGenerator level1Generator;
+    private Level2ChunkGenerator level2Generator;
     private VoidChunkGenerator voidGenerator;
     private LimboManager limboManager;
     private Level1Manager level1Manager;
+    private Level2Manager level2Manager;
     private BackroomsListeners listeners;
     private HallucinationManager hallucinations;
     private BodycamManager bodycam;
@@ -48,6 +50,7 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         this.craftingManager.registerRecipes();
         this.limboManager = new LimboManager(this);
         this.level1Manager = new Level1Manager(this);
+        this.level2Manager = new Level2Manager(this);
         this.listeners = new BackroomsListeners(this);
         this.hallucinations = new HallucinationManager(this);
         this.bodycam = new BodycamManager(this);
@@ -70,6 +73,7 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
             configureLevel0WorldRules();
             this.limboManager.init();
             this.level1Manager.start();
+            this.level2Manager.start();
             this.listeners.start();
             this.hallucinations.start();
             this.bodycam.start();
@@ -77,7 +81,8 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
             registerVoiceChatHook();
             getLogger().info("YunexalBackrooms worlds ready: Level 0='"
                     + backroomsConfig.getLevel0WorldName() + "', Level 1='"
-                    + backroomsConfig.getLevel1WorldName() + "', Limbo='"
+                    + backroomsConfig.getLevel1WorldName() + "', Level 2='"
+                    + backroomsConfig.getLevel2WorldName() + "', Limbo='"
                     + backroomsConfig.getLimboWorldName() + "', Border="
                     + (int) backroomsConfig.getWorldBorderSize()
                     + ", View/Sim=" + backroomsConfig.getViewDistance() + "/" + backroomsConfig.getSimulationDistance());
@@ -113,6 +118,9 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         if (level1Manager != null) {
             level1Manager.shutdown();
         }
+        if (level2Manager != null) {
+            level2Manager.shutdown();
+        }
         getServer().getMessenger().unregisterOutgoingPluginChannel(this, "BungeeCord");
     }
 
@@ -143,6 +151,11 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
             this.level1Generator = new Level1ChunkGenerator(this);
         } else {
             this.level1Generator.clearCache();
+        }
+        if (this.level2Generator == null) {
+            this.level2Generator = new Level2ChunkGenerator(this);
+        } else {
+            this.level2Generator.clearCache();
         }
         this.voidGenerator = new VoidChunkGenerator(this.backroomsConfig);
         if (Bukkit.getServer() != null) {
@@ -191,6 +204,10 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
                 || (id != null && id.equalsIgnoreCase("level1"))) {
             return level1Generator;
         }
+        if (worldName.equalsIgnoreCase(backroomsConfig.getLevel2WorldName())
+                || (id != null && id.equalsIgnoreCase("level2"))) {
+            return level2Generator;
+        }
         return level0Generator;
     }
 
@@ -220,6 +237,14 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
 
     public Level1Manager getLevel1Manager() {
         return level1Manager;
+    }
+
+    public Level2ChunkGenerator getLevel2Generator() {
+        return level2Generator;
+    }
+
+    public Level2Manager getLevel2Manager() {
+        return level2Manager;
     }
 
     public VoidChunkGenerator getVoidGenerator() {
@@ -254,10 +279,14 @@ public final class YunexalBackroomsPlugin extends JavaPlugin {
         return level1Manager != null ? level1Manager.getLevel1World() : Bukkit.getWorld(backroomsConfig.getLevel1WorldName());
     }
 
+    public @Nullable World getLevel2World() {
+        return level2Manager != null ? level2Manager.getLevel2World() : Bukkit.getWorld(backroomsConfig.getLevel2WorldName());
+    }
+
     public boolean isBackroomsGameplayWorld(@Nullable World world) {
         if (world == null) {
             return false;
         }
-        return world.equals(getLevel0World()) || world.equals(getLevel1World());
+        return world.equals(getLevel0World()) || world.equals(getLevel1World()) || world.equals(getLevel2World());
     }
 }

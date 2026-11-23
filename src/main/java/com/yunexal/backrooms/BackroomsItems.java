@@ -231,6 +231,21 @@ public final class BackroomsItems {
         return book;
     }
 
+    public ItemStack createLevel2ManualBook() {
+        ItemStack book = new ItemStack(Material.WRITTEN_BOOK, 1);
+        BookMeta meta = (BookMeta) book.getItemMeta();
+        meta.setTitle("Протокол M.E.G. // Рівень 2");
+        meta.setAuthor("Розвідник M.E.G.");
+        meta.addPages(
+                Component.text("РІВЕНЬ 2: «ПОКИНУТІ ПІДСОБНІ ПРИМІЩЕННЯ»\n(«Мрії про труби»)\nКлас виживання: 2\n\nДовгі тісні бетонно-цегляні тунелі, захаращені промисловими трубами й затихлими агрегатами."),
+                Component.text("НЕБЕЗПЕКА СПЕКИ (>43°C):\n\nУ котельних і перегрітих секціях із труб виривається гаряча пара, яка швидко виснажує та зневоднює.\nЗавжди тримайте при собі Мигдальну воду!"),
+                Component.text("СУТНОСТІ:\n\nОкрім Усміхнених, Гончаків і Шкірокрадів, тут мешкають Смертомолі (Deathmoths).\nТісні тунелі не дають легко втекти — не затримуйтесь надовго в темряві."),
+                Component.text("ВИХОДИ:\n\nГлибше в комунікаціях трапляються зачинені броньовані двері на Рівень 3 («Електрична станція»).")
+        );
+        book.setItemMeta(meta);
+        return book;
+    }
+
     public ItemStack cannedRation(int amount) {
         return build(Material.COOKED_BEEF, amount, ID_CANNED_RATION,
                 Component.text("Консерви M.E.G.", NamedTextColor.GOLD),

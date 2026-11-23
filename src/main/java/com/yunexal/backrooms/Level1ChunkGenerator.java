@@ -223,6 +223,20 @@ public final class Level1ChunkGenerator extends ChunkGenerator {
             return;
         }
 
+        // Rare Technical Maintenance Utility Doorway -> Level 2 ("Pipe Dreams")
+        if (!corner && (zone == Level1ZoneType.STORAGE_CORRIDOR || zone == Level1ZoneType.LOADING_BAY)) {
+            boolean northWall = (inCellZ == 0);
+            int pos = northWall ? inCellX : inCellZ;
+            if (isLevel2DoorPanel(seed, cx, cz, northWall, zone) && (pos == 1 || pos == 2)) {
+                chunkData.setBlock(lx, floorY + 1, lz, Material.COPPER_BLOCK);
+                chunkData.setBlock(lx, floorY + 2, lz, Material.IRON_BLOCK);
+                chunkData.setBlock(lx, floorY + 3, lz, Material.COPPER_BLOCK);
+                chunkData.setBlock(lx, floorY + 4, lz, Material.POLISHED_DEEPSLATE);
+                chunkData.setBlock(lx, ceilingY - 1, lz, Material.POLISHED_DEEPSLATE);
+                return;
+            }
+        }
+
         long colHash = mix64(seed ^ 0x517CC1B727220A95L, wx, wz);
         double detailRoll = toUnitDouble(colHash);
 
@@ -516,6 +530,36 @@ public final class Level1ChunkGenerator extends ChunkGenerator {
             case TOMS_DINER -> new Location(world, 16.5, floorY + 1.0, -64 + 16.5, 0f, 0f);
             default -> getArrivalLocation(world);
         };
+    }
+
+    public boolean isLevel2DoorPanel(long seed, int cx, int cz, boolean northWall, Level1ZoneType zone) {
+        if (zone != Level1ZoneType.STORAGE_CORRIDOR && zone != Level1ZoneType.LOADING_BAY) {
+            return false;
+        }
+        if (Math.abs(cx) <= 3 && Math.abs(cz) <= 3) {
+            return false;
+        }
+        return toUnitDouble(mix64(seed ^ 0x2222C0FFEE2222L, cx * 2 + (northWall ? 1 : 0), cz)) >= 0.985;
+    }
+
+    public boolean isLevel2TransitionDoor(World world, int wx, int wy, int wz) {
+        BackroomsConfig cfg = cfg();
+        if (wy < cfg.getLevel1FloorY() + 1 || wy > cfg.getLevel1FloorY() + 3) {
+            return false;
+        }
+        int cx = Math.floorDiv(wx, CELL_SIZE);
+        int cz = Math.floorDiv(wz, CELL_SIZE);
+        int ix = Math.floorMod(wx, CELL_SIZE);
+        int iz = Math.floorMod(wz, CELL_SIZE);
+        if (ix == 0 && iz == 0) return false;
+        if (ix > 0 && iz > 0) return false;
+        boolean northWall = (iz == 0);
+        int pos = northWall ? ix : iz;
+        if (pos != 1 && pos != 2) return false;
+        long seed = effectiveSeed(world);
+        Level1ZoneType zone = getZoneType(seed, cx, cz);
+        return isLevel2DoorPanel(seed, cx, cz, northWall, zone)
+                && (northWall ? hasNorthWall(seed, cx, cz) : hasWestWall(seed, cx, cz));
     }
 
     public boolean isInProtectedOutpostCore(World world, int wx, int wz) {

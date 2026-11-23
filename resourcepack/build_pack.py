@@ -399,7 +399,49 @@ def generate_textures():
     d1[30:32, :] -= [12, 12, 12]
     save_png(d1, "polished_deepslate.png")
 
-    # 26. Smiler & Hound Custom Item Display Sprites (1.21.4+ / 26.3 items/ + models/item/ + textures/item/)
+    # 26. Level 2 Chalky Dusty Concrete Tunnel Wall (andesite.png)
+    rng_a2 = np.random.default_rng(2121)
+    a2 = np.zeros((32, 32, 3), dtype=np.float32)
+    a2[:, :] = [110, 106, 98]
+    a2 += rng_a2.normal(0, 6.0, (32, 32, 1))
+    # Chalky white dust smudges + soot streaks near ceiling/floor
+    for _ in range(16):
+        cx, cy = rng_a2.integers(2, 29, size=2)
+        a2[cy : cy + 3, cx : cx + 3] += [24, 23, 21]
+    a2[0:2, :] -= [18, 17, 15]
+    a2[29:32, :] -= [22, 20, 18]
+    save_png(a2, "andesite.png")
+
+    # 27. Level 2 Soiled Dirty-Brown Industrial Tunnel Brick (bricks.png)
+    rng_b2 = np.random.default_rng(2222)
+    b2 = np.zeros((32, 32, 3), dtype=np.float32)
+    b2[:, :] = [92, 74, 62]
+    b2 += rng_b2.normal(0, 5.5, (32, 32, 1))
+    for y in range(0, 32, 8):
+        b2[y, :] = [58, 52, 46]
+        off = 0 if ((y // 8) % 2 == 0) else 8
+        for x in range(off, 32, 16):
+            b2[y : y + 8, x] = [58, 52, 46]
+    save_png(b2, "bricks.png")
+
+    # 28. Level 2 Hot Industrial Riveted Pipe & Flange (copper_block.png & cut_copper.png)
+    rng_p2 = np.random.default_rng(2323)
+    p2 = np.zeros((32, 32, 3), dtype=np.float32)
+    p2[:, :] = [116, 72, 52]
+    p2 += rng_p2.normal(0, 4.0, (32, 32, 1))
+    # Longitudinal metallic cylindrical highlight + riveted flange seam
+    for y in range(32):
+        shine = math.sin(y / 31.0 * math.pi) * 28.0
+        p2[y, :] += [shine, shine * 0.75, shine * 0.6]
+    p2[:, 0:2] = [68, 44, 34]
+    p2[:, 30:32] = [68, 44, 34]
+    save_png(p2, "copper_block.png")
+
+    hot_p = p2.copy()
+    hot_p[:, 14:18] = [84, 52, 38]
+    save_png(hot_p, "cut_copper.png")
+
+    # 29. Smiler & Hound Custom Item Display Sprites (1.21.4+ / 26.3 items/ + models/item/ + textures/item/)
     item_tex_dir = os.path.join(PACK_DIR, "assets", "minecraft", "textures", "item")
     item_model_dir = os.path.join(PACK_DIR, "assets", "minecraft", "models", "item")
     item_def_dir = os.path.join(PACK_DIR, "assets", "minecraft", "items")
@@ -875,6 +917,17 @@ def generate_audio():
     bk_lr = fade_edges(bk_lr, sr, fade_in_s=0.005, fade_out_s=0.35)
     synth_ogg(bk_lr, os.path.join(SND_DIR, "level1_blackout_breaker.ogg"), sr, drive=1.25, target_peak=0.48)
 
+    # 18. pipe_steam_hiss.ogg (1.4s 48kHz pressurized hot steam jet & industrial pipe resonance)
+    dur_ps = 1.4
+    nps = int(sr * dur_ps)
+    tps = np.linspace(0.0, dur_ps, nps, endpoint=False)
+    ps_env = np.sin(np.pi * tps / dur_ps) ** 0.55 * np.exp(-1.1 * tps)
+    hiss = fft_band(rng.normal(0.0, 1.0, (nps, 2)), sr, low_hz=1300.0, high_hz=6800.0, order=1.8)
+    clank = ensure_stereo(0.42 * np.sin(2.0 * np.pi * 145.0 * tps) * np.exp(-16.0 * tps))
+    ps_lr = corridor_reverb((hiss * 0.55 + clank) * ps_env[:, None], sr, rt60=0.85, wet=0.38, bright_hz=3800.0, seed=181)
+    ps_lr = fade_edges(ps_lr, sr, fade_in_s=0.02, fade_out_s=0.28)
+    synth_ogg(ps_lr, os.path.join(SND_DIR, "pipe_steam_hiss.ogg"), sr, drive=1.2, target_peak=0.44)
+
     write_json(os.path.join(PACK_DIR, "assets", "minecraft", "sounds.json"), {
         "backrooms.ambient.hum": {
             "sounds": [{"name": "backrooms/fluorescent_hum", "stream": False}]
@@ -927,6 +980,9 @@ def generate_audio():
         "backrooms.fx.blackout_breaker": {
             "sounds": [{"name": "backrooms/level1_blackout_breaker", "stream": False}]
         },
+        "backrooms.fx.steam_hiss": {
+            "sounds": [{"name": "backrooms/pipe_steam_hiss", "stream": False}]
+        },
     })
 
 
@@ -940,7 +996,7 @@ def main():
         "pack": {
             "min_format": 97,
             "max_format": 120,
-            "description": "YUNEXAL BACKROOMS // Level 0 & Level 1 Habitable Zone (26.3)",
+            "description": "YUNEXAL BACKROOMS // Levels 0, 1 & 2 Pipe Dreams (26.3)",
         }
     })
 

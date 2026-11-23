@@ -197,10 +197,12 @@ public final class HallucinationManager {
 
         // Update fatigue & trigger individual psychological hallucinations
         World level1 = plugin.getLevel1World();
+        World level2 = plugin.getLevel2World();
         for (Player player : Bukkit.getOnlinePlayers()) {
             boolean inL0 = player.getWorld().equals(level0);
             boolean inL1 = level1 != null && player.getWorld().equals(level1);
-            if ((!inL0 && !inL1)
+            boolean inL2 = level2 != null && player.getWorld().equals(level2);
+            if ((!inL0 && !inL1 && !inL2)
                     || plugin.getLimboManager().isInLimbo(player)
                     || !plugin.getLimboManager().isVerified(player)) {
                 continue;
@@ -222,6 +224,13 @@ public final class HallucinationManager {
                     };
                     double next = Math.max(0.0, Math.min(1.0, fatigueMap.getOrDefault(uid, 0.0) + delta));
                     fatigueMap.put(uid, next);
+                }
+            } else if (inL2) {
+                Level2ChunkGenerator.Level2ZoneType z2 = plugin.getLevel2Generator().getZoneAtBlock(level2, loc.getBlockX(), loc.getBlockZ());
+                inSafeSanctuary = (z2 == Level2ChunkGenerator.Level2ZoneType.SURVIVOR_OFFICE);
+                if (now >= almondCalmUntilMs.getOrDefault(uid, 0L)) {
+                    double delta = inSafeSanctuary ? -0.015 : (z2 == Level2ChunkGenerator.Level2ZoneType.BOILER_HOT_ZONE ? +0.005 : +0.002);
+                    fatigueMap.put(uid, Math.max(0.0, Math.min(1.0, fatigueMap.getOrDefault(uid, 0.0) + delta)));
                 }
             } else {
                 inSafeSanctuary = plugin.getLevel1Generator() != null

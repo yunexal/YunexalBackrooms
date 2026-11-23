@@ -151,6 +151,10 @@ public final class BodycamManager {
                     if (zone == Level0ChunkGenerator.ZoneType.RED_ROOM) {
                         redTremor = Math.sin(st.phase * 4.3) * 0.06;
                     }
+                } else if (player.getWorld().equals(plugin.getLevel2World())
+                        && plugin.getLevel2Generator().getZoneAtBlock(player.getWorld(), loc.getBlockX(), loc.getBlockZ())
+                        == Level2ChunkGenerator.Level2ZoneType.BOILER_HOT_ZONE) {
+                    redTremor = Math.sin(st.phase * 5.0) * 0.05;
                 } else if (plugin.getLevel1Manager() != null
                         && plugin.getLevel1Manager().getBlackoutPhase() == Level1Manager.BlackoutPhase.BLACKOUT) {
                     redTremor = Math.sin(st.phase * 3.8) * 0.04;

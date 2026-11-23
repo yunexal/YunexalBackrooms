@@ -66,6 +66,14 @@ public final class BackroomsConfig {
     private final boolean level1BlackoutEntitySpawns;
     private final boolean level1FogParticles;
 
+    private final String level2WorldName;
+    private final long level2Seed;
+    private final int level2FloorY;
+    private final int level2WallHeight;
+    private final double level2WorldBorderSize;
+    private final boolean level2SteamHazardEnabled;
+    private final boolean level2EntitySpawns;
+
     private final boolean ambientEnabled;
     private final long humIntervalTicks;
     private final int flickerCooldownSeconds;
@@ -137,6 +145,14 @@ public final class BackroomsConfig {
         this.level1BlackoutDurationSeconds = Math.max(15, cfg.getInt("level1.blackout-duration-seconds", 40));
         this.level1BlackoutEntitySpawns = cfg.getBoolean("level1.blackout-entity-spawns", true);
         this.level1FogParticles = cfg.getBoolean("level1.fog-particles", true);
+
+        this.level2WorldName = cfg.getString("level2.world-name", "world_level2");
+        this.level2Seed = cfg.getLong("level2.seed", 20010514L);
+        this.level2FloorY = Math.max(-50, Math.min(200, cfg.getInt("level2.floor-y", 64)));
+        this.level2WallHeight = Math.max(3, Math.min(6, cfg.getInt("level2.wall-height", 3)));
+        this.level2WorldBorderSize = Math.max(256.0, cfg.getDouble("level2.world-border-size", 10000.0));
+        this.level2SteamHazardEnabled = cfg.getBoolean("level2.steam-hazard-enabled", true);
+        this.level2EntitySpawns = cfg.getBoolean("level2.entity-spawns", true);
 
         this.ambientEnabled = cfg.getBoolean("ambient.enabled", true);
         this.humIntervalTicks = Math.max(60L, cfg.getLong("ambient.hum-interval-ticks", 300L));
@@ -224,6 +240,15 @@ public final class BackroomsConfig {
     public int getLevel1BlackoutDurationSeconds() { return level1BlackoutDurationSeconds; }
     public boolean isLevel1BlackoutEntitySpawns() { return level1BlackoutEntitySpawns; }
     public boolean isLevel1FogParticles() { return level1FogParticles; }
+
+    public String getLevel2WorldName() { return level2WorldName; }
+    public long getLevel2Seed() { return level2Seed; }
+    public int getLevel2FloorY() { return level2FloorY; }
+    public int getLevel2WallHeight() { return level2WallHeight; }
+    public int getLevel2CeilingY() { return level2FloorY + level2WallHeight + 1; }
+    public double getLevel2WorldBorderSize() { return level2WorldBorderSize; }
+    public boolean isLevel2SteamHazardEnabled() { return level2SteamHazardEnabled; }
+    public boolean isLevel2EntitySpawns() { return level2EntitySpawns; }
 
     public boolean isAmbientEnabled() { return ambientEnabled; }
     public long getHumIntervalTicks() { return humIntervalTicks; }

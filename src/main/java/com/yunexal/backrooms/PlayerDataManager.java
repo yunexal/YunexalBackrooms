@@ -154,9 +154,10 @@ public final class PlayerDataManager {
 
         BackroomsConfig cfg = plugin.getBackroomsConfig();
         boolean isL1 = targetWorld.equals(plugin.getLevel1World());
-        double border = isL1 ? cfg.getLevel1WorldBorderSize() : cfg.getWorldBorderSize();
-        int floorY = isL1 ? cfg.getLevel1FloorY() : cfg.getFloorY();
-        int ceilingY = isL1 ? cfg.getLevel1CeilingY() : cfg.getCeilingY();
+        boolean isL2 = targetWorld.equals(plugin.getLevel2World());
+        double border = isL2 ? cfg.getLevel2WorldBorderSize() : (isL1 ? cfg.getLevel1WorldBorderSize() : cfg.getWorldBorderSize());
+        int floorY = isL2 ? cfg.getLevel2FloorY() : (isL1 ? cfg.getLevel1FloorY() : cfg.getFloorY());
+        int ceilingY = isL2 ? cfg.getLevel2CeilingY() : (isL1 ? cfg.getLevel1CeilingY() : cfg.getCeilingY());
         double half = (border * 0.5) - 4.0;
         if (Math.abs(x) > half || Math.abs(z) > half) {
             return null;
@@ -166,6 +167,7 @@ public final class PlayerDataManager {
         }
         Location target = new Location(targetWorld, x, y, z, yaw, pitch);
         if (!target.getBlock().isPassable() || !target.clone().add(0, 1, 0).getBlock().isPassable()) {
+            if (isL2) return plugin.getLevel2Generator().getArrivalLocation(targetWorld);
             return isL1 ? plugin.getLevel1Generator().getArrivalLocation(targetWorld) : null;
         }
         return target;

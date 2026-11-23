@@ -295,6 +295,7 @@ public final class LimboManager implements Listener {
         }
         player.teleport(targetLoc);
         boolean arrivedInLevel1 = targetLoc.getWorld() != null && targetLoc.getWorld().equals(plugin.getLevel1World());
+        boolean arrivedInLevel2 = targetLoc.getWorld() != null && targetLoc.getWorld().equals(plugin.getLevel2World());
 
         for (Player other : Bukkit.getOnlinePlayers()) {
             if (!other.equals(player) && !pendingJoinAtMs.containsKey(other.getUniqueId())) {
@@ -307,7 +308,13 @@ public final class LimboManager implements Listener {
             player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.65f, 1.0f);
         }
 
-        if (arrivedInLevel1) {
+        if (arrivedInLevel2) {
+            player.showTitle(Title.title(
+                    Component.text("РІВЕНЬ 2", NamedTextColor.GOLD, TextDecoration.BOLD),
+                    Component.text("«Покинуті підсобні приміщення» // Мрії про труби", NamedTextColor.GRAY),
+                    Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(4), Duration.ofMillis(800))
+            ));
+        } else if (arrivedInLevel1) {
             player.showTitle(Title.title(
                     Component.text("РІВЕНЬ 1", NamedTextColor.GRAY, TextDecoration.BOLD),
                     Component.text("«Населена зона» // Склади та аванпости", NamedTextColor.DARK_GRAY),

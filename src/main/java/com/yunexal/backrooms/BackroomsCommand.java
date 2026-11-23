@@ -29,13 +29,18 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
         if (args.length == 0 || args[0].equalsIgnoreCase("info")) {
             BackroomsConfig cfg = plugin.getBackroomsConfig();
             boolean inL1 = (sender instanceof Player p) && plugin.getLevel1World() != null && p.getWorld().equals(plugin.getLevel1World());
+            boolean inL2 = (sender instanceof Player p) && plugin.getLevel2World() != null && p.getWorld().equals(plugin.getLevel2World());
+            String titleStr = inL2 ? "• Рівень 2 «Покинуті підсобні приміщення»"
+                    : (inL1 ? "• Рівень 1 «Населена зона»" : "• Рівень 0 «Лобі»");
+            String descStr = inL2
+                    ? "2 (Тунелі труб, спека >43°C, Смертомолі та Шкірокради)"
+                    : (inL1 ? "2 (Склади, ящики, мерехтіння, аванпости M.E.G. / B.N.T.G.)"
+                    : "1 (Виживайте, щоб знайти блимаючу стіну до Рівня 1)");
             sender.sendMessage(Component.text("YUNEXAL BACKROOMS ", NamedTextColor.YELLOW)
-                    .append(Component.text(inL1 ? "• Рівень 1 «Населена зона»" : "• Рівень 0 «Лобі»", NamedTextColor.GRAY)));
+                    .append(Component.text(titleStr, NamedTextColor.GRAY)));
             sender.sendMessage(Component.text("Клас виживання: ", NamedTextColor.GRAY)
-                    .append(Component.text(inL1
-                            ? "2 (Склади, ящики, мерехтіння, аванпости M.E.G. / B.N.T.G.)"
-                            : "1 (Виживайте, щоб знайти блимаючу стіну до Рівня 1)", NamedTextColor.YELLOW)));
-            if (!inL1 && sender instanceof Player p) {
+                    .append(Component.text(descStr, NamedTextColor.YELLOW)));
+            if (!inL1 && !inL2 && sender instanceof Player p) {
                 int sec = plugin.getPlayerData().getSurvivalSecondsLevel0(p);
                 int minSec = cfg.getExitMinSurvivalSeconds();
                 sender.sendMessage(Component.text("Час виживання на Рівні 0: ", NamedTextColor.GRAY)
@@ -51,7 +56,10 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
                     .append(Component.text("/br hub", NamedTextColor.AQUA)));
             if (sender.hasPermission("yunexal.backrooms.admin") && sender instanceof Player p) {
                 Location l = p.getLocation();
-                if (inL1) {
+                if (inL2) {
+                    Level2ChunkGenerator.Level2ZoneType z2 = plugin.getLevel2Generator().getZoneAtBlock(l.getWorld(), l.getBlockX(), l.getBlockZ());
+                    sender.sendMessage(Component.text("[Admin] Рівень 2 зона: " + z2.name(), NamedTextColor.DARK_GRAY));
+                } else if (inL1) {
                     Level1ChunkGenerator.Level1ZoneType z1 = plugin.getLevel1Generator().getZoneAtBlock(l.getWorld(), l.getBlockX(), l.getBlockZ());
                     sender.sendMessage(Component.text("[Admin] Рівень 1 зона: " + z1.name() + " | Світло: " + plugin.getLevel1Manager().getBlackoutPhase().name(), NamedTextColor.DARK_GRAY));
                 } else if (plugin.getLevel0World() != null && p.getWorld().equals(plugin.getLevel0World())) {
@@ -120,13 +128,19 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 if (!(sender instanceof Player p) || args.length < 2) {
-                    sender.sendMessage(Component.text("Використання: /br tp <level0|level1|limbo|basealpha|trader|diner>", NamedTextColor.YELLOW));
+                    sender.sendMessage(Component.text("Використання: /br tp <level0|level1|level2|limbo|basealpha|trader|diner>", NamedTextColor.YELLOW));
                     return true;
                 }
                 String dest = args[1].toLowerCase(Locale.ROOT);
                 if (dest.equals("limbo")) {
                     p.teleport(plugin.getLimboManager().getLimboSpawnLocation());
                     p.sendMessage(Component.text("Телепортація в Лімбо.", NamedTextColor.GRAY));
+                } else if (dest.equals("level2") || dest.equals("l2")) {
+                    World l2 = plugin.getLevel2World();
+                    if (l2 != null) {
+                        p.teleport(plugin.getLevel2Generator().getArrivalLocation(l2));
+                        p.sendMessage(Component.text("Телепортація на Рівень 2 («Мрії про труби»).", NamedTextColor.GOLD));
+                    }
                 } else if (dest.equals("level1") || dest.equals("l1") || dest.equals("basealpha") || dest.equals("trader") || dest.equals("diner")) {
                     World l1 = plugin.getLevel1World();
                     if (l1 != null) {
@@ -171,17 +185,19 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
                 switch (args[1].toLowerCase(Locale.ROOT)) {
                     case "spawn" -> {
                         if (!(sender instanceof Player p) || args.length < 3) {
-                            sender.sendMessage(Component.text("Використання: /br entity spawn <bacteria|smiler|hound|faceless|skin_stealer>", NamedTextColor.YELLOW));
+                            sender.sendMessage(Component.text("Використання: /br entity spawn <bacteria|smiler|hound|faceless|skin_stealer|deathmoth>", NamedTextColor.YELLOW));
                             return true;
                         }
                         BackroomsEntityManager.EntityKind kind = BackroomsEntityManager.parseKind(args[2]);
                         if (kind == null) {
-                            sender.sendMessage(Component.text("Невідома сутність. Доступні: bacteria, smiler, hound, faceless, skin_stealer", NamedTextColor.RED));
+                            sender.sendMessage(Component.text("Невідома сутність. Доступні: bacteria, smiler, hound, faceless, skin_stealer, deathmoth", NamedTextColor.RED));
                             return true;
                         }
-                        int floorY = p.getWorld().equals(plugin.getLevel1World())
+                        int floorY = p.getWorld().equals(plugin.getLevel2World())
+                                ? plugin.getBackroomsConfig().getLevel2FloorY()
+                                : (p.getWorld().equals(plugin.getLevel1World())
                                 ? plugin.getBackroomsConfig().getLevel1FloorY()
-                                : plugin.getBackroomsConfig().getFloorY();
+                                : plugin.getBackroomsConfig().getFloorY());
                         Location spot = em.findSpawnSpotNear(p.getWorld(), p.getLocation(), floorY, 5, 10);
                         if (spot == null) {
                             spot = p.getLocation().add(p.getLocation().getDirection().setY(0).normalize().multiply(4));
@@ -226,14 +242,14 @@ public final class BackroomsCommand implements CommandExecutor, TabCompleter {
         }
         if (sender.hasPermission("yunexal.backrooms.admin")) {
             if (args.length == 2 && args[0].equalsIgnoreCase("tp")) {
-                return List.of("level0", "level1", "limbo", "basealpha", "trader", "diner");
+                return List.of("level0", "level1", "level2", "limbo", "basealpha", "trader", "diner");
             }
             if (args.length == 2 && (args[0].equalsIgnoreCase("entity") || args[0].equalsIgnoreCase("mob"))) {
                 return List.of("spawn", "autospawn", "list", "clear");
             }
             if (args.length == 3 && (args[0].equalsIgnoreCase("entity") || args[0].equalsIgnoreCase("mob"))) {
                 if (args[1].equalsIgnoreCase("spawn")) {
-                    return List.of("bacteria", "smiler", "hound", "faceless", "skin_stealer");
+                    return List.of("bacteria", "smiler", "hound", "faceless", "skin_stealer", "deathmoth");
                 }
                 if (args[1].equalsIgnoreCase("autospawn")) {
                     return List.of("on", "off", "status");

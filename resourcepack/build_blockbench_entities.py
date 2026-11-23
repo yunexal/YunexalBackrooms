@@ -231,6 +231,44 @@ def make_uv_atlas_soldier_gear(out_png):
     Image.fromarray(img, mode="RGBA").save(out_png)
 
 
+def make_uv_atlas_deathmoth(out_png):
+    """64x64 moth chitin body, dusty dark-umber patterned wings & glowing amber moth eyes."""
+    rng = np.random.default_rng(7707)
+    img = np.zeros((64, 64, 4), dtype=np.uint8)
+
+    # [0..32, 0..32]: Fuzzy dark taupe/chestnut thorax & segmented abdomen
+    for y in range(32):
+        for x in range(32):
+            seg = -14 if (y % 5 == 0) else 0
+            r = int(np.clip(82 + seg + rng.normal(0, 4.0), 48, 108))
+            g = int(np.clip(72 + seg + rng.normal(0, 3.5), 42, 96))
+            b = int(np.clip(58 + seg + rng.normal(0, 3.5), 34, 80))
+            img[y, x] = [r, g, b, 255]
+
+    # [32..64, 0..32]: Dusty mottled moth wing membrane with eye-spot rings
+    for y in range(32):
+        for x in range(32, 64):
+            lx = x - 32
+            d_spot = ((lx - 18) ** 2 + (y - 12) ** 2) ** 0.5
+            r = int(np.clip(112 + rng.normal(0, 6.0), 78, 138))
+            g = int(np.clip(98 + rng.normal(0, 5.5), 68, 122))
+            b = int(np.clip(78 + rng.normal(0, 5.0), 54, 100))
+            if 4.0 <= d_spot <= 6.2:
+                r, g, b = 32, 28, 24
+            elif d_spot < 3.0:
+                r, g, b = 158, 132, 82
+            img[y, x] = [r, g, b, 255]
+
+    # [0..32, 32..64]: Pale-amber compound moth eyes
+    img[32:64, 0:32] = [235, 198, 96, 255]
+    img[40:56, 8:24] = [255, 228, 145, 255]
+
+    # [32..64, 32..64]: Feathered antennae & chitin legs
+    img[32:64, 32:64] = [48, 42, 36, 255]
+
+    Image.fromarray(img, mode="RGBA").save(out_png)
+
+
 def uv_box(u_px, v_px, w_px=32, h_px=32):
     """Maps a pixel sub-region in a 64x64 atlas to Minecraft 0..16 UV box dict."""
     u1 = round(u_px * 16.0 / 64.0, 3)
@@ -373,12 +411,14 @@ def generate_blockbench_entities(pack_dir, blockbench_src_dir):
     hound_png = os.path.join(item_tex_dir, "entity_hound.png")
     faceless_png = os.path.join(item_tex_dir, "entity_faceless.png")
     skin_png = os.path.join(item_tex_dir, "entity_skinstealer.png")
+    moth_png = os.path.join(item_tex_dir, "entity_deathmoth.png")
     soldier_png = os.path.join(item_tex_dir, "entity_soldier_gear.png")
     make_uv_atlas_bacteria(bac_png)
     make_uv_atlas_smiler(smiler_png)
     make_uv_atlas_hound(hound_png)
     make_uv_atlas_faceless(faceless_png)
     make_uv_atlas_skinstealer(skin_png)
+    make_uv_atlas_deathmoth(moth_png)
     make_uv_atlas_soldier_gear(soldier_png)
 
     WIRE = (0, 0, 32, 32)
@@ -677,12 +717,43 @@ def generate_blockbench_entities(pack_dir, blockbench_src_dir):
         ]),
     ]
 
+    # =========================================================================
+    # DEATHMOTH (Large nocturnal Backrooms moth of Level 2 pipe tunnels)
+    # =========================================================================
+    DM_BODY = (0, 0, 32, 32)
+    DM_WING = (32, 0, 32, 32)
+    DM_EYE = (0, 32, 32, 32)
+    DM_ANT = (32, 32, 32, 32)
+
+    deathmoth_bones = [
+        ("deathmoth_body", (0, 18, 0), [
+            # Thorax & drooping segmented abdomen
+            elem(5.4, 6.0, 4.2, 10.6, 11.2, 11.4, DM_BODY),
+            elem(5.8, 3.0, 10.6, 10.2, 9.0, 18.2, DM_BODY, (22.5, "x", (8, 8, 11))),
+            # Head + glowing compound eyes + feathered antennae
+            elem(6.0, 6.8, 1.5, 10.0, 10.2, 4.6, DM_BODY),
+            elem(5.7, 7.6, 1.4, 7.0, 9.2, 2.8, DM_EYE),
+            elem(9.0, 7.6, 1.4, 10.3, 9.2, 2.8, DM_EYE),
+            elem(6.2, 9.8, -1.2, 6.8, 11.6, 2.2, DM_ANT, (-22.5, "z", (6.5, 10, 1.5))),
+            elem(9.2, 9.8, -1.2, 9.8, 11.6, 2.2, DM_ANT, (22.5, "z", (9.5, 10, 1.5))),
+        ]),
+        ("deathmoth_wing_left", (3, 19, 0), [
+            elem(8.0, 7.6, 4.0, 20.5, 8.2, 13.5, DM_WING),
+            elem(10.5, 7.3, 11.5, 18.5, 7.8, 18.0, DM_WING),
+        ]),
+        ("deathmoth_wing_right", (-3, 19, 0), [
+            elem(-4.5, 7.6, 4.0, 8.0, 8.2, 13.5, DM_WING),
+            elem(-2.5, 7.3, 11.5, 5.5, 7.8, 18.0, DM_WING),
+        ]),
+    ]
+
     for tex_key, bones in (
         ("minecraft:item/entity_bacteria", bacteria_bones),
         ("minecraft:item/entity_smiler", smiler_bones),
         ("minecraft:item/entity_hound", hound_bones),
         ("minecraft:item/entity_faceless", faceless_bones),
         ("minecraft:item/entity_skinstealer", skinstealer_bones),
+        ("minecraft:item/entity_deathmoth", deathmoth_bones),
     ):
         for bone_name, _, els in bones:
             write_json(os.path.join(item_model_dir, f"{bone_name}.json"), build_bone_model(tex_key, els))
@@ -698,6 +769,7 @@ def generate_blockbench_entities(pack_dir, blockbench_src_dir):
     export_bbmodel(os.path.join(blockbench_src_dir, "hound.bbmodel"), "hound", "entity_hound.png", hound_png, hound_bones)
     export_bbmodel(os.path.join(blockbench_src_dir, "faceless.bbmodel"), "faceless", "entity_faceless.png", faceless_png, faceless_bones)
     export_bbmodel(os.path.join(blockbench_src_dir, "skinstealer.bbmodel"), "skinstealer", "entity_skinstealer.png", skin_png, skinstealer_bones)
+    export_bbmodel(os.path.join(blockbench_src_dir, "deathmoth.bbmodel"), "deathmoth", "entity_deathmoth.png", moth_png, deathmoth_bones)
 
     # Tactical M.E.G. & B.N.T.G. soldier head gear models (covers head cleanly when worn in HEAD slot)
     S_MEG = (0, 0, 32, 32)

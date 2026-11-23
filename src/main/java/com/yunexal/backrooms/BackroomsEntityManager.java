@@ -52,7 +52,8 @@ public final class BackroomsEntityManager implements Listener {
         SMILER,
         HOUND,
         FACELESS,
-        SKIN_STEALER
+        SKIN_STEALER,
+        DEATHMOTH
     }
 
     private final YunexalBackroomsPlugin plugin;
@@ -118,6 +119,7 @@ public final class BackroomsEntityManager implements Listener {
         shutdown();
         purgeOrphanParts(plugin.getLevel0World());
         purgeOrphanParts(plugin.getLevel1World());
+        purgeOrphanParts(plugin.getLevel2World());
         aiTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickAI, 2L, 2L);
         startSpawnTimer();
     }
@@ -185,6 +187,7 @@ public final class BackroomsEntityManager implements Listener {
         tracked.clear();
         purgeOrphanParts(plugin.getLevel0World());
         purgeOrphanParts(plugin.getLevel1World());
+        purgeOrphanParts(plugin.getLevel2World());
         return removed;
     }
 
@@ -194,6 +197,9 @@ public final class BackroomsEntityManager implements Listener {
         }
         if (w.equals(plugin.getLevel1World())) {
             return Level1ChunkGenerator.isOutpostZone(plugin.getLevel1Generator().getZoneAtBlock(w, x, z));
+        }
+        if (w.equals(plugin.getLevel2World())) {
+            return plugin.getLevel2Generator().getZoneAtBlock(w, x, z) == Level2ChunkGenerator.Level2ZoneType.SURVIVOR_OFFICE;
         }
         return true;
     }
@@ -264,6 +270,14 @@ public final class BackroomsEntityManager implements Listener {
                     setAttr(z, Attribute.FOLLOW_RANGE, 32.0);
                     setAttr(z, Attribute.STEP_HEIGHT, 1.0);
                 }
+                case DEATHMOTH -> {
+                    setAttr(z, Attribute.MAX_HEALTH, 28.0);
+                    z.setHealth(28.0);
+                    setAttr(z, Attribute.MOVEMENT_SPEED, 0.35);
+                    setAttr(z, Attribute.ATTACK_DAMAGE, 5.0);
+                    setAttr(z, Attribute.FOLLOW_RANGE, 30.0);
+                    setAttr(z, Attribute.STEP_HEIGHT, 1.0);
+                }
             }
         });
 
@@ -318,6 +332,12 @@ public final class BackroomsEntityManager implements Listener {
                 addBone(w, loc, te, "arm_right", "skinstealer_arm_right", -0.29f, +0.05f, 0.0f, s, false);
                 addBone(w, loc, te, "head", "skinstealer_head", 0.0f, +0.20f, +0.05f, s, false);
                 addBone(w, loc, te, "eyes", "skinstealer_eyes", 0.0f, +0.20f, +0.05f, s, true);
+            }
+            case DEATHMOTH -> {
+                float s = 1.05f;
+                addBone(w, loc, te, "body", "deathmoth_body", 0.0f, +0.15f, 0.0f, s, false);
+                addBone(w, loc, te, "wing_left", "deathmoth_wing_left", +0.18f, +0.20f, 0.0f, s, false);
+                addBone(w, loc, te, "wing_right", "deathmoth_wing_right", -0.18f, +0.20f, 0.0f, s, false);
             }
         }
     }
@@ -432,6 +452,7 @@ public final class BackroomsEntityManager implements Listener {
                 case HOUND -> tickHound(te, z, nearest, mLoc, dist, los, now);
                 case FACELESS -> tickFaceless(te, z, nearest, mLoc, dist, los, now);
                 case SKIN_STEALER -> tickSkinStealer(te, z, nearest, mLoc, dist, los, now);
+                case DEATHMOTH -> tickDeathmoth(te, z, nearest, mLoc, dist, los, now);
             }
             animateEntity(te, z, nearest, mLoc, now);
         }
@@ -511,6 +532,13 @@ public final class BackroomsEntityManager implements Listener {
                 animateBone(te.bones.get("leg_left"), 0f, 0f, 0f, +stride, 0f, 0f);
                 animateBone(te.bones.get("leg_right"), 0f, 0f, 0f, -stride, 0f, 0f);
             }
+            case DEATHMOTH -> {
+                float flap = (float) Math.sin(ph * 3.4f) * 0.62f;
+                float hover = (float) Math.sin(ph * 1.1f) * 0.14f;
+                animateBone(te.bones.get("body"), 0f, hover, 0f, moving ? 0.12f : 0.0f, 0f, 0f);
+                animateBone(te.bones.get("wing_left"), 0f, hover, 0f, 0f, 0f, +flap);
+                animateBone(te.bones.get("wing_right"), 0f, hover, 0f, 0f, 0f, -flap);
+            }
         }
     }
 
@@ -580,6 +608,14 @@ public final class BackroomsEntityManager implements Listener {
         setAttr(z, Attribute.MOVEMENT_SPEED, now < te.chaseBurstUntilMs ? 0.33 : 0.28);
     }
 
+    private void tickDeathmoth(TrackedEntity te, Zombie z, Player target, Location mLoc, double dist, boolean los, long now) {
+        if (los && dist <= 16.0 && now >= te.nextVocalAtMs) {
+            te.nextVocalAtMs = now + 5500L;
+            target.playSound(mLoc, "minecraft:backrooms.fx.whisper", SoundCategory.HOSTILE, 0.45f, 1.35f);
+        }
+        setAttr(z, Attribute.MOVEMENT_SPEED, los ? 0.36 : 0.30);
+    }
+
     private void tickAutoSpawn() {
         BackroomsConfig cfg = plugin.getBackroomsConfig();
         if (!cfg.isEntitiesEnabled() || getActiveCount() >= cfg.getEntitiesMaxGlobal()) {
@@ -587,6 +623,7 @@ public final class BackroomsEntityManager implements Listener {
         }
         World level0 = plugin.getLevel0World();
         World level1 = plugin.getLevel1World();
+        World level2 = plugin.getLevel2World();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
 
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -598,12 +635,16 @@ public final class BackroomsEntityManager implements Listener {
             }
             boolean inL0 = w.equals(level0);
             boolean inL1 = level1 != null && w.equals(level1);
+            boolean inL2 = level2 != null && w.equals(level2);
             if (inL0 && !autoSpawnOverride) {
                 continue;
             }
             boolean l1Blackout = inL1 && plugin.getLevel1Manager() != null
                     && plugin.getLevel1Manager().getBlackoutPhase() != Level1Manager.BlackoutPhase.LIT;
             if (inL1 && (!cfg.isLevel1BlackoutEntitySpawns() || (!l1Blackout && rng.nextDouble() > 0.18))) {
+                continue;
+            }
+            if (inL2 && (!cfg.isLevel2EntitySpawns() || rng.nextDouble() > 0.45)) {
                 continue;
             }
             if (inL0 && rng.nextDouble() >= cfg.getEntitiesAutoSpawnChance()) {
@@ -615,14 +656,23 @@ public final class BackroomsEntityManager implements Listener {
                 continue;
             }
 
-            int floorY = inL1 ? cfg.getLevel1FloorY() : cfg.getFloorY();
-            Location spawnSpot = findSpawnSpotNear(w, pLoc, floorY, 18, 30);
+            int floorY = inL2 ? cfg.getLevel2FloorY() : (inL1 ? cfg.getLevel1FloorY() : cfg.getFloorY());
+            Location spawnSpot = findSpawnSpotNear(w, pLoc, floorY, 16, 28);
             if (spawnSpot == null) {
                 continue;
             }
 
             EntityKind kind;
-            if (inL1) {
+            if (inL2) {
+                int roll = rng.nextInt(5);
+                kind = switch (roll) {
+                    case 0 -> EntityKind.DEATHMOTH;
+                    case 1 -> EntityKind.SMILER;
+                    case 2 -> EntityKind.SKIN_STEALER;
+                    case 3 -> EntityKind.HOUND;
+                    default -> EntityKind.FACELESS;
+                };
+            } else if (inL1) {
                 if (l1Blackout) {
                     int roll = rng.nextInt(4);
                     kind = switch (roll) {

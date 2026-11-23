@@ -64,6 +64,7 @@ public final class BackroomsListeners implements Listener {
     private final NamespacedKey manilaStockedKey;
     private final NamespacedKey manilaOpenedKey;
     private final NamespacedKey level1CrateKey;
+    private final NamespacedKey level2CrateKey;
 
     private final Map<UUID, Long> lastHumAtMs = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastFlickerAtMs = new ConcurrentHashMap<>();
@@ -90,6 +91,7 @@ public final class BackroomsListeners implements Listener {
         this.manilaStockedKey = new NamespacedKey(plugin, "manila_stocked");
         this.manilaOpenedKey = new NamespacedKey(plugin, "manila_opened");
         this.level1CrateKey = new NamespacedKey(plugin, "level1_crate");
+        this.level2CrateKey = new NamespacedKey(plugin, "level2_crate");
     }
 
     public void start() {
@@ -157,6 +159,7 @@ public final class BackroomsListeners implements Listener {
         int ceilingY = cfg.getCeilingY();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         World level1 = plugin.getLevel1World();
+        World level2 = plugin.getLevel2World();
 
         // Seal expired Flickering Exit Wall breaches back into solid Level 0 walls
         Iterator<Map.Entry<BlockKey, Long>> riftIt = activeExitRifts.entrySet().iterator();
@@ -179,7 +182,8 @@ public final class BackroomsListeners implements Listener {
             World pw = player.getWorld();
             boolean inL0 = pw.equals(level0);
             boolean inL1 = level1 != null && pw.equals(level1);
-            if ((!inL0 && !inL1)
+            boolean inL2 = level2 != null && pw.equals(level2);
+            if ((!inL0 && !inL1 && !inL2)
                     || plugin.getLimboManager().isInLimbo(player)
                     || !plugin.getLimboManager().isVerified(player)) {
                 continue;
@@ -197,6 +201,15 @@ public final class BackroomsListeners implements Listener {
                     if (!blackout) {
                         player.playSound(player, "minecraft:backrooms.ambient.hum", SoundCategory.AMBIENT, 0.10f, 0.88f);
                     }
+                }
+                continue;
+            }
+
+            if (inL2) {
+                long prevHum = lastHumAtMs.getOrDefault(uid, 0L);
+                if (now - prevHum >= humIntervalMs) {
+                    lastHumAtMs.put(uid, now);
+                    player.playSound(player, "minecraft:backrooms.ambient.hum", SoundCategory.AMBIENT, 0.11f, 0.78f);
                 }
                 continue;
             }
@@ -583,6 +596,38 @@ public final class BackroomsListeners implements Listener {
         }, 10L);
     }
 
+    public void transitionToLevel2(Player player) {
+        World level2 = plugin.getLevel2World();
+        if (level2 == null || !player.isOnline()) {
+            return;
+        }
+        restoreFlashlight(player);
+        restoreFlickerWalls(player);
+        player.playSound(player, "minecraft:backrooms.ui.noclip", SoundCategory.MASTER, 0.7f, 0.82f);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 44, 0, false, false, false));
+        Location arrival = plugin.getLevel2Generator().getArrivalLocation(level2);
+        player.teleport(arrival);
+        plugin.getPlayerData().savePlayer(player);
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            player.playSound(player, "minecraft:backrooms.fx.steam_hiss", SoundCategory.AMBIENT, 0.55f, 0.92f);
+            player.showTitle(Title.title(
+                    Component.text("РІВЕНЬ 2", NamedTextColor.GOLD, TextDecoration.BOLD),
+                    Component.text("«Покинуті підсобні приміщення» // Мрії про труби", NamedTextColor.WHITE),
+                    Title.Times.times(Duration.ofMillis(250), Duration.ofSeconds(4), Duration.ofMillis(800))
+            ));
+            player.sendMessage(Component.text("▸ ", NamedTextColor.GOLD)
+                    .append(Component.text("Ви відчинили службові двері й спустилися на ", NamedTextColor.GRAY))
+                    .append(Component.text("Рівень 2 «Мрії про труби»", NamedTextColor.WHITE))
+                    .append(Component.text(". Повітря розпечене паром (>43°C), а в темряві вузьких тунелів кружляють ", NamedTextColor.GRAY))
+                    .append(Component.text("Смертомолі", NamedTextColor.RED))
+                    .append(Component.text(". Тримайте Мигдалеву Воду напоготові!", NamedTextColor.GRAY)));
+        }, 10L);
+    }
+
     @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
@@ -595,6 +640,7 @@ public final class BackroomsListeners implements Listener {
         }
         World level0 = plugin.getLevel0World();
         World level1 = plugin.getLevel1World();
+        World level2 = plugin.getLevel2World();
         if (plugin.getLimboManager().isInLimbo(player) || !plugin.getLimboManager().isVerified(player)) {
             return;
         }
@@ -605,9 +651,12 @@ public final class BackroomsListeners implements Listener {
         Action action = event.getAction();
         Block clicked = event.getClickedBlock();
 
-        // Allow native container/station usage cleanly, ensuring Manila/Level 1 barrels always have loot if unstocked
+        // Allow native container/station usage cleanly, ensuring Manila/Level 1/Level 2 barrels always have loot if unstocked
         if (action == Action.RIGHT_CLICK_BLOCK && clicked != null) {
-            if (clicked.getType() == Material.CRAFTING_TABLE || clicked.getType() == Material.FURNACE || clicked.getType() == Material.SMOKER) {
+            if (clicked.getType() == Material.CRAFTING_TABLE
+                    || clicked.getType() == Material.FURNACE
+                    || clicked.getType() == Material.BLAST_FURNACE
+                    || clicked.getType() == Material.SMOKER) {
                 return;
             }
             if (clicked.getType() == Material.BARREL) {
@@ -628,6 +677,12 @@ public final class BackroomsListeners implements Listener {
                     } else if (level1 != null && pw.equals(level1)) {
                         if (!pdc.has(manilaOpenedKey, PersistentDataType.BYTE) && !pdc.has(level1CrateKey, PersistentDataType.BYTE)) {
                             Level1Populator.fillLevel1CrateLoot(barrel.getInventory(), barrel, ThreadLocalRandom.current(), items, level1CrateKey);
+                            pdc.set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
+                            barrel.update(true, false);
+                        }
+                    } else if (level2 != null && pw.equals(level2)) {
+                        if (!pdc.has(manilaOpenedKey, PersistentDataType.BYTE) && !pdc.has(level2CrateKey, PersistentDataType.BYTE)) {
+                            Level2Populator.fillUtilityLockerLoot(barrel.getInventory(), barrel, ThreadLocalRandom.current(), items, level2CrateKey);
                             pdc.set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
                             barrel.update(true, false);
                         }
@@ -702,6 +757,28 @@ public final class BackroomsListeners implements Listener {
                 player.sendActionBar(Component.text("Стіна блимає, та простір ще тримає вас! Виживіть ще "
                         + (rem / 60) + ":" + String.format("%02d", rem % 60), NamedTextColor.YELLOW));
             }
+            return;
+        }
+
+        // Level 1 Technical Utility Door -> opens transition into Level 2
+        if (clicked != null && level1 != null && pw.equals(level1) && level2 != null && action == Action.RIGHT_CLICK_BLOCK
+                && plugin.getLevel1Generator().isLevel2TransitionDoor(level1, clicked.getX(), clicked.getY(), clicked.getZ())) {
+            event.setCancelled(true);
+            Location doorLoc = clicked.getLocation().add(0.5, 0.5, 0.5);
+            level1.playSound(doorLoc, Sound.BLOCK_IRON_DOOR_OPEN, SoundCategory.BLOCKS, 0.85f, 0.85f);
+            level1.playSound(doorLoc, "minecraft:backrooms.fx.steam_hiss", SoundCategory.AMBIENT, 0.7f, 1.0f);
+            lastExitTransitionAtMs.put(player.getUniqueId(), System.currentTimeMillis());
+            Bukkit.getScheduler().runTask(plugin, () -> transitionToLevel2(player));
+            return;
+        }
+
+        // Level 2 -> Level 3 locked Electrical Station teaser door
+        if (clicked != null && level2 != null && pw.equals(level2) && action == Action.RIGHT_CLICK_BLOCK
+                && plugin.getLevel2Generator().isLevel3TeaserBlock(level2, clicked.getX(), clicked.getY(), clicked.getZ())) {
+            event.setCancelled(true);
+            Location doorLoc = clicked.getLocation().add(0.5, 0.5, 0.5);
+            level2.playSound(doorLoc, Sound.BLOCK_IRON_DOOR_CLOSE, SoundCategory.BLOCKS, 0.8f, 0.7f);
+            player.sendActionBar(Component.text("Двері замкнені: за ними чути високовольтний гул Рівня 3 («Електрична станція»)", NamedTextColor.RED));
             return;
         }
 
@@ -952,10 +1029,33 @@ public final class BackroomsListeners implements Listener {
         World bw = block.getWorld();
         World level0 = plugin.getLevel0World();
         World level1 = plugin.getLevel1World();
+        World level2 = plugin.getLevel2World();
         if (!plugin.isBackroomsGameplayWorld(bw)) {
             if (!player.hasPermission("yunexal.backrooms.admin")) {
                 event.setCancelled(true);
             }
+            return;
+        }
+
+        // Level 1 Technical Utility Door -> transitions into Level 2 ("Pipe Dreams")
+        if (level1 != null && bw.equals(level1) && level2 != null
+                && plugin.getLevel1Generator().isLevel2TransitionDoor(level1, block.getX(), block.getY(), block.getZ())) {
+            event.setCancelled(true);
+            Location doorLoc = block.getLocation().add(0.5, 0.5, 0.5);
+            level1.playSound(doorLoc, Sound.BLOCK_IRON_DOOR_OPEN, SoundCategory.BLOCKS, 0.85f, 0.85f);
+            level1.playSound(doorLoc, "minecraft:backrooms.fx.steam_hiss", SoundCategory.AMBIENT, 0.7f, 1.0f);
+            lastExitTransitionAtMs.put(player.getUniqueId(), System.currentTimeMillis());
+            Bukkit.getScheduler().runTask(plugin, () -> transitionToLevel2(player));
+            return;
+        }
+
+        // Level 2 -> Level 3 teaser door (locked electrical station)
+        if (level2 != null && bw.equals(level2)
+                && plugin.getLevel2Generator().isLevel3TeaserBlock(level2, block.getX(), block.getY(), block.getZ())) {
+            event.setCancelled(true);
+            Location doorLoc = block.getLocation().add(0.5, 0.5, 0.5);
+            level2.playSound(doorLoc, Sound.BLOCK_IRON_DOOR_CLOSE, SoundCategory.BLOCKS, 0.8f, 0.7f);
+            player.sendActionBar(Component.text("Двері замкнені: за ними чути високовольтний гул Рівня 3 («Електрична станція»)", NamedTextColor.RED));
             return;
         }
 
@@ -999,13 +1099,19 @@ public final class BackroomsListeners implements Listener {
         }
 
         boolean inL1 = (level1 != null && bw.equals(level1));
+        boolean inL2 = (level2 != null && bw.equals(level2));
         if (inL1 && plugin.getLevel1Generator().isInProtectedOutpostCore(level1, block.getX(), block.getZ())) {
             event.setCancelled(true);
             player.sendActionBar(Component.text("Територія аванпосту людства захищена!", NamedTextColor.RED));
             return;
         }
+        if (inL2 && plugin.getLevel2Generator().isInProtectedOfficeCore(level2, block.getX(), block.getZ())) {
+            event.setCancelled(true);
+            player.sendActionBar(Component.text("Технічний офіс уцілілих захищений!", NamedTextColor.RED));
+            return;
+        }
 
-        int ceilingY = inL1 ? cfg.getLevel1CeilingY() : cfg.getCeilingY();
+        int ceilingY = inL1 ? cfg.getLevel1CeilingY() : (inL2 ? cfg.getLevel2CeilingY() : cfg.getCeilingY());
         if (block.getType() == Material.BEDROCK || block.getY() >= ceilingY) {
             event.setCancelled(true);
             return;
@@ -1047,7 +1153,7 @@ public final class BackroomsListeners implements Listener {
                     block.getWorld().dropItemNaturally(dropLoc, items.dampWallpaper(1));
                     block.getWorld().playSound(dropLoc, "minecraft:backrooms.fx.wallpaper_tear", SoundCategory.BLOCKS, 0.65f, 0.75f);
                 }
-                case IRON_BLOCK -> {
+                case IRON_BLOCK, COPPER_BLOCK, CUT_COPPER -> {
                     block.getWorld().dropItemNaturally(dropLoc, items.metalPlate(1));
                     block.getWorld().playSound(dropLoc, "minecraft:backrooms.fx.metal_pry", SoundCategory.BLOCKS, 0.65f, 0.95f);
                 }
@@ -1069,19 +1175,26 @@ public final class BackroomsListeners implements Listener {
         Block block = event.getBlock();
         World bw = block.getWorld();
         World level1 = plugin.getLevel1World();
+        World level2 = plugin.getLevel2World();
         if (!plugin.isBackroomsGameplayWorld(bw)) {
             event.setCancelled(true);
             return;
         }
         BackroomsConfig cfg = plugin.getBackroomsConfig();
         boolean inL1 = (level1 != null && bw.equals(level1));
+        boolean inL2 = (level2 != null && bw.equals(level2));
         if (inL1 && plugin.getLevel1Generator().isInProtectedOutpostCore(level1, block.getX(), block.getZ())) {
             event.setCancelled(true);
             player.sendActionBar(Component.text("Територія аванпосту людства захищена!", NamedTextColor.RED));
             return;
         }
-        int floorY = inL1 ? cfg.getLevel1FloorY() : cfg.getFloorY();
-        int ceilingY = inL1 ? cfg.getLevel1CeilingY() : cfg.getCeilingY();
+        if (inL2 && plugin.getLevel2Generator().isInProtectedOfficeCore(level2, block.getX(), block.getZ())) {
+            event.setCancelled(true);
+            player.sendActionBar(Component.text("Технічний офіс уцілілих захищений!", NamedTextColor.RED));
+            return;
+        }
+        int floorY = inL1 ? cfg.getLevel1FloorY() : (inL2 ? cfg.getLevel2FloorY() : cfg.getFloorY());
+        int ceilingY = inL1 ? cfg.getLevel1CeilingY() : (inL2 ? cfg.getLevel2CeilingY() : cfg.getCeilingY());
         if (block.getY() >= ceilingY || block.getY() < floorY - 1) {
             event.setCancelled(true);
             return;
@@ -1095,6 +1208,7 @@ public final class BackroomsListeners implements Listener {
             barrel.getPersistentDataContainer().set(manilaStockedKey, PersistentDataType.BYTE, (byte) 1);
             barrel.getPersistentDataContainer().set(manilaOpenedKey, PersistentDataType.BYTE, (byte) 1);
             barrel.getPersistentDataContainer().set(level1CrateKey, PersistentDataType.BYTE, (byte) 1);
+            barrel.getPersistentDataContainer().set(level2CrateKey, PersistentDataType.BYTE, (byte) 1);
             barrel.update(true, false);
         }
     }
@@ -1143,6 +1257,11 @@ public final class BackroomsListeners implements Listener {
             return;
         }
         String deathWorldName = lastDeathWorld.remove(player.getUniqueId());
+        World level2 = plugin.getLevel2World();
+        if (level2 != null && level2.getName().equals(deathWorldName)) {
+            event.setRespawnLocation(plugin.getLevel2Generator().getArrivalLocation(level2));
+            return;
+        }
         World level1 = plugin.getLevel1World();
         if (level1 != null && level1.getName().equals(deathWorldName)) {
             event.setRespawnLocation(plugin.getLevel1Generator().getArrivalLocation(level1));

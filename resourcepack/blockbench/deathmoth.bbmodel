@@ -1,0 +1,998 @@
+{
+  "meta": {
+    "format_version": "4.10",
+    "model_format": "java_block",
+    "box_uv": false
+  },
+  "name": "deathmoth",
+  "resolution": {
+    "width": 64,
+    "height": 64
+  },
+  "elements": [
+    {
+      "name": "deathmoth_body_0",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -2.5999999999999996,
+        16.0,
+        -3.8
+      ],
+      "to": [
+        2.5999999999999996,
+        21.2,
+        3.4000000000000004
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        18,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "ff1166de-14c9-5ce0-81a9-c8d9b7db873c"
+    },
+    {
+      "name": "deathmoth_body_1",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -2.2,
+        13.0,
+        2.5999999999999996
+      ],
+      "to": [
+        2.1999999999999993,
+        19.0,
+        10.2
+      ],
+      "rotation": [
+        22.5,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        18,
+        3
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "893edf2c-e8d1-50d1-b6e7-eaff55574b62"
+    },
+    {
+      "name": "deathmoth_body_2",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -2.0,
+        16.8,
+        -6.5
+      ],
+      "to": [
+        2.0,
+        20.2,
+        -3.4000000000000004
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        18,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            0.0,
+            32.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "80812262-d277-5a2b-bb01-571751d6f4e2"
+    },
+    {
+      "name": "deathmoth_body_3",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -2.3,
+        17.6,
+        -6.6
+      ],
+      "to": [
+        -1.0,
+        19.2,
+        -5.2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        18,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "8e9a2b0e-aba9-5706-9816-2bc47df738ed"
+    },
+    {
+      "name": "deathmoth_body_4",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        1.0,
+        17.6,
+        -6.6
+      ],
+      "to": [
+        2.3000000000000007,
+        19.2,
+        -5.2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        0,
+        18,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            0.0,
+            32.0,
+            32.0,
+            64.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "c028e3fc-9eb2-5b4c-90c6-9835973b88fd"
+    },
+    {
+      "name": "deathmoth_body_5",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -1.7999999999999998,
+        19.8,
+        -9.2
+      ],
+      "to": [
+        -1.2000000000000002,
+        21.6,
+        -5.8
+      ],
+      "rotation": [
+        0,
+        0,
+        -22.5
+      ],
+      "origin": [
+        -1.5,
+        20,
+        -6.5
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "e226db6f-c8fe-5ca3-9b13-2375a6b67fa4"
+    },
+    {
+      "name": "deathmoth_body_6",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        1.1999999999999993,
+        19.8,
+        -9.2
+      ],
+      "to": [
+        1.8000000000000007,
+        21.6,
+        -5.8
+      ],
+      "rotation": [
+        0,
+        0,
+        22.5
+      ],
+      "origin": [
+        1.5,
+        20,
+        -6.5
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "afe66580-668f-5102-ba29-b44a4275f56e"
+    },
+    {
+      "name": "deathmoth_wing_left_0",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        3.0,
+        18.6,
+        -4.0
+      ],
+      "to": [
+        15.5,
+        19.2,
+        5.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        3,
+        19,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "948bbf3f-fe68-5b4a-8f03-bc609f504309"
+    },
+    {
+      "name": "deathmoth_wing_left_1",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        5.5,
+        18.3,
+        3.5
+      ],
+      "to": [
+        13.5,
+        18.8,
+        10.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        3,
+        19,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "a4319029-cf7d-59f6-8a2c-e1aa2b40f85b"
+    },
+    {
+      "name": "deathmoth_wing_right_0",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -15.5,
+        18.6,
+        -4.0
+      ],
+      "to": [
+        -3.0,
+        19.2,
+        5.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        -3,
+        19,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "b437e1c7-a882-5001-bd62-0c3e36e51043"
+    },
+    {
+      "name": "deathmoth_wing_right_1",
+      "box_uv": false,
+      "rescale": false,
+      "locked": false,
+      "from": [
+        -13.5,
+        18.3,
+        3.5
+      ],
+      "to": [
+        -5.5,
+        18.8,
+        10.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "origin": [
+        -3,
+        19,
+        0
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "east": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "south": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "west": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "up": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        },
+        "down": {
+          "uv": [
+            32.0,
+            0.0,
+            64.0,
+            32.0
+          ],
+          "texture": 0
+        }
+      },
+      "uuid": "ffbef243-a2c6-51ff-85f4-45364ff5c3a3"
+    }
+  ],
+  "outliner": [
+    {
+      "name": "deathmoth_body",
+      "origin": [
+        0,
+        18,
+        0
+      ],
+      "color": 0,
+      "uuid": "94cf4347-7e10-5019-b927-e92910386283",
+      "export": true,
+      "isOpen": true,
+      "visibility": true,
+      "children": [
+        "ff1166de-14c9-5ce0-81a9-c8d9b7db873c",
+        "893edf2c-e8d1-50d1-b6e7-eaff55574b62",
+        "80812262-d277-5a2b-bb01-571751d6f4e2",
+        "8e9a2b0e-aba9-5706-9816-2bc47df738ed",
+        "c028e3fc-9eb2-5b4c-90c6-9835973b88fd",
+        "e226db6f-c8fe-5ca3-9b13-2375a6b67fa4",
+        "afe66580-668f-5102-ba29-b44a4275f56e"
+      ]
+    },
+    {
+      "name": "deathmoth_wing_left",
+      "origin": [
+        3,
+        19,
+        0
+      ],
+      "color": 0,
+      "uuid": "5d8679a2-0e53-5de8-b82d-b8f153c0c637",
+      "export": true,
+      "isOpen": true,
+      "visibility": true,
+      "children": [
+        "948bbf3f-fe68-5b4a-8f03-bc609f504309",
+        "a4319029-cf7d-59f6-8a2c-e1aa2b40f85b"
+      ]
+    },
+    {
+      "name": "deathmoth_wing_right",
+      "origin": [
+        -3,
+        19,
+        0
+      ],
+      "color": 0,
+      "uuid": "bdfc93b4-3fa7-58f0-8451-24d6183d4123",
+      "export": true,
+      "isOpen": true,
+      "visibility": true,
+      "children": [
+        "b437e1c7-a882-5001-bd62-0c3e36e51043",
+        "ffbef243-a2c6-51ff-85f4-45364ff5c3a3"
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "name": "entity_deathmoth.png",
+      "id": "0",
+      "uuid": "86be92a5-6ab7-5489-8c3c-9cfd250ef6e6",
+      "source": "data:image/png;base64,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",
+      "width": 64,
+      "height": 64,
+      "uv_width": 64,
+      "uv_height": 64,
+      "visible": true
+    }
+  ]
+}
